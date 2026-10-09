@@ -26,7 +26,7 @@ Replace the URL with the reachable backend address for your environment.
 Run from the frontend project directory:
 
 ```powershell
-docker build -t maarga-hms-frontend .
+docker build --no-cache --build-arg VITE_API_BASE_URL=http://16.176.31.53:8001 -t maarga-hms-frontend .
 ```
 
 The Dockerfile copies the project files and runs `npm run build`. Vite reads the `.env` configuration during the build.
