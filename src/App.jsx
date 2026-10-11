@@ -1,17 +1,16 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import Home from "./Pages/Home";
 import Login from "./Pages/Login";
 import ForgotPassword from "./Pages/ForgotPassword";
 import Dashboard from "./Pages/Dashboard";
 
-import PatientRegistration from "./pages/PatientRegistration";
+import PatientRegistration from "./Pages/PatientRegistration";
 import Patients from "./Pages/Patients";
 import EditPatient from "./Pages/EditPatient";
 
 import OPBills from "./Pages/OPBills";
 import CreateOPBill from "./Pages/CreateOPBill";
-import OPBillDetails from "./pages/OPBillDetails";
+import OPBillDetails from "./Pages/OPBillDetails";
 
 import IPBills from "./Pages/IPBills";
 import CreateIPBill from "./Pages/CreateIPBill";
@@ -21,10 +20,10 @@ import Payments from "./Pages/Payments";
 import CreatePayment from "./Pages/CreatePayment";
 import ReceiptDetails from "./Pages/ReceiptDetails";
 
-import Roles from "./pages/Roles";
-import CreateRole from "./pages/CreateRole";
-import EditRole from "./pages/EditRole";
-import RoleDetails from "./pages/RoleDetails";
+import Roles from "./Pages/Roles";
+import CreateRole from "./Pages/CreateRole";
+import EditRole from "./Pages/EditRole";
+import RoleDetails from "./Pages/RoleDetails";
 
 import Users from "./Pages/Users";
 import CreateUser from "./Pages/CreateUser";
