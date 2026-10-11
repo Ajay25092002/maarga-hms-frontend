@@ -156,12 +156,12 @@ const handleSubmit = async (e) => {
                   Password
                 </label>
 
-                <Link
+                {/* <Link
                   to="/forgot-password"
                   className="text-xs font-medium text-[#3E439C] hover:text-[#303680] dark:text-indigo-300"
                 >
                   Forgot password?
-                </Link>
+                </Link> */}
               </div>
 
               <div className="relative">
