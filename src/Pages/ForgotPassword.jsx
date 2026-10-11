@@ -195,7 +195,7 @@ export default function ForgotPassword() {
                 Maarga Mindcare
               </h1>
               <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Hospital Management System
+                Hospital Billing
               </p>
             </div>
           </div>

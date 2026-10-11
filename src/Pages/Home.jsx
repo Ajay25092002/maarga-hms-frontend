@@ -10,7 +10,7 @@ export default function Home() {
       <div className="min-h-screen md:ml-[248px]">
         <TopNavbar
           title="Hospital Operations"
-          breadcrumb={["Hospital Management", "Workspace"]}
+          breadcrumb={["Hospital Billing", "Workspace"]}
         />
       </div>
     </div>

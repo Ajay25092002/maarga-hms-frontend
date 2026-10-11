@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+import { useAuth } from "../Context/AuthContext";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -16,6 +17,7 @@ const API_BASE_URL = (
 
 export default function Login() {
   const navigate = useNavigate();
+  const { refreshAuth } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,54 +25,62 @@ export default function Login() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
 
-    if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+
+  if (!email.trim() || !password) {
+    setError("Please enter your email and password.");
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        email: email.trim(),
+        password,
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setError(
+        data?.detail ||
+          "Unable to sign in. Please check your credentials and try again."
+      );
       return;
     }
 
-    setIsLoading(true);
+    const authenticated = await refreshAuth();
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-        }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        setError(
-          data?.detail ||
-            "Unable to sign in. Please check your credentials and try again."
-        );
-        return;
-      }
-
-      // The browser stores the HttpOnly session cookie automatically.
-      // Do not save the session ID or password in localStorage.
-      setPassword("");
-      navigate("/home", { replace: true });
-    } catch (err) {
-      console.error("Login request failed:", err);
-
+    if (!authenticated) {
       setError(
-        "Unable to connect to the server. Please check that the backend is running."
+        "Login succeeded, but your session could not be verified. Please try again."
       );
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+
+    setPassword("");
+    navigate("/home", { replace: true });
+  } catch (err) {
+    console.error("Login request failed:", err);
+    setError(
+      "Unable to connect to the server. Please check that the backend is running."
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F5F5FB] px-4 py-4 text-[#292B38] transition-colors dark:bg-[#171827] dark:text-gray-100">
@@ -89,7 +99,7 @@ export default function Login() {
                 Maarga Mindcare
               </h1>
               <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Hospital Management System
+                Hospital Billing
               </p>
             </div>
           </div>
