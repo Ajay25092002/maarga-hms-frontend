@@ -703,7 +703,7 @@ export default function CreateOPBill() {
       rate_category: rateCategory, // Added
 
       // Doctor and psychologist information
-
+      doctor_id: Number(doctorId),
       doctor_name: doctorName.trim() || null,
 
       psychologist_name: psychologistName.trim() || null,
