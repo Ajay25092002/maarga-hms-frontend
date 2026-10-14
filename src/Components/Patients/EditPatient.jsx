@@ -9,7 +9,6 @@ import {
   Save,
   Mail,
   RotateCcw,
-  Hash,
   LoaderCircle,
   AlertCircle,
 } from "lucide-react";
@@ -27,7 +26,6 @@ const initialForm = {
   mobile: "",
   email: "",
   address: "",
-  registration_number: "",
 };
 
 function getErrorMessage(data, fallback) {
@@ -45,14 +43,7 @@ function getErrorMessage(data, fallback) {
   return fallback;
 }
 
-function Field({
-  label,
-  name,
-  required = false,
-  error,
-  labelClass,
-  children,
-}) {
+function Field({ label, name, required = false, error, labelClass, children }) {
   return (
     <div className="min-w-0">
       <label htmlFor={name} className={labelClass}>
@@ -106,7 +97,7 @@ export default function EditPatient() {
       : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
   }`;
 
-  const mutedClass = isDark ? "text-slate-400" : "text-slate-400";
+  const mutedClass = "text-slate-400";
 
   const fetchPatient = useCallback(
     async (signal) => {
@@ -125,14 +116,14 @@ export default function EditPatient() {
             headers: { Accept: "application/json" },
             credentials: "include",
             signal,
-          }
+          },
         );
 
         const data = await response.json().catch(() => null);
 
         if (!response.ok) {
           throw new Error(
-            getErrorMessage(data, "Unable to load patient details.")
+            getErrorMessage(data, "Unable to load patient details."),
           );
         }
 
@@ -153,7 +144,6 @@ export default function EditPatient() {
           mobile: patient.mobile ?? "",
           email: patient.email ?? "",
           address: patient.address ?? "",
-          registration_number: patient.registration_number ?? "",
         });
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -166,7 +156,7 @@ export default function EditPatient() {
         }
       }
     },
-    [patientId]
+    [patientId],
   );
 
   useEffect(() => {
@@ -245,7 +235,6 @@ export default function EditPatient() {
       mobile: originalPatient.mobile ?? "",
       email: originalPatient.email ?? "",
       address: originalPatient.address ?? "",
-      registration_number: originalPatient.registration_number ?? "",
     });
 
     setErrors({});
@@ -268,7 +257,6 @@ export default function EditPatient() {
         mobile: form.mobile.trim(),
         email: form.email.trim() || null,
         address: form.address.trim() || null,
-        registration_number: form.registration_number.trim() || null,
       };
 
       const response = await fetch(
@@ -281,15 +269,13 @@ export default function EditPatient() {
           },
           credentials: "include",
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Unable to update patient.")
-        );
+        throw new Error(getErrorMessage(data, "Unable to update patient."));
       }
 
       showToast({
@@ -421,7 +407,7 @@ export default function EditPatient() {
                   {
                     dateStyle: "medium",
                     timeStyle: "short",
-                  }
+                  },
                 )
               : "—"}
           </p>
@@ -495,11 +481,7 @@ export default function EditPatient() {
             </div>
           </Field>
 
-          <Field
-            label="Gender"
-            name="gender"
-            labelClass={labelClass}
-          >
+          <Field label="Gender" name="gender" labelClass={labelClass}>
             <select
               id="gender"
               name="gender"
@@ -511,9 +493,7 @@ export default function EditPatient() {
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="other">Other</option>
-              <option value="prefer not to say">
-                Prefer not to say
-              </option>
+              <option value="prefer not to say">Prefer not to say</option>
             </select>
           </Field>
 
@@ -539,31 +519,8 @@ export default function EditPatient() {
             </div>
           </Field>
 
-          <Field
-            label="Registration Number"
-            name="registration_number"
-            labelClass={labelClass}
-          >
-            <div className="relative">
-              <LeadingIcon icon={Hash} className={mutedClass} />
-              <input
-                id="registration_number"
-                name="registration_number"
-                value={form.registration_number}
-                onChange={updateField}
-                placeholder="Enter registration number"
-                maxLength={100}
-                className={`${inputClass} pl-10`}
-              />
-            </div>
-          </Field>
-
           <div className="min-w-0 md:col-span-2">
-            <Field
-              label="Address"
-              name="address"
-              labelClass={labelClass}
-            >
+            <Field label="Address" name="address" labelClass={labelClass}>
               <div className="relative">
                 <MapPin
                   size={16}
@@ -575,7 +532,7 @@ export default function EditPatient() {
                   rows={3}
                   value={form.address}
                   onChange={updateField}
-                  placeholder="House number, street, area and locality"
+                  placeholder="House number, street, area, city and state"
                   maxLength={1000}
                   className={`block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
                     isDark

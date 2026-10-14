@@ -5,12 +5,17 @@ import { ArrowLeft, ShieldCheck, Save, AlertCircle } from "lucide-react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
-const API_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "") + "/api/roles";
+const API_URL =
+  (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(
+    /\/+$/,
+    "",
+  ) + "/api/roles";
 
 const GROUPS = [
-  { title: "Dashboard", keys: ["dashboard.view"] },
+  {
+    title: "Dashboard",
+    keys: ["dashboard.view"],
+  },
   {
     title: "OP Patients",
     keys: ["patients.op.view", "patients.op.create", "patients.op.edit"],
@@ -19,9 +24,53 @@ const GROUPS = [
     title: "IP Patients",
     keys: ["patients.ip.view", "patients.ip.create", "patients.ip.edit"],
   },
-  { title: "OP Bills", keys: ["bills.op.view", "bills.op.create"] },
-  { title: "IP Bills", keys: ["bills.ip.view", "bills.ip.create"] },
-  { title: "Payments & Receipts", keys: ["payments.view", "payments.create"] },
+  {
+    title: "OP Bills",
+    keys: ["bills.op.view", "bills.op.create"],
+  },
+  {
+    title: "IP Bills",
+    keys: ["bills.ip.view", "bills.ip.create"],
+  },
+  {
+    title: "Payments & Receipts",
+    keys: ["payments.view", "payments.create"],
+  },
+  {
+    title: "Service Groups",
+    keys: [
+      "service_groups.view",
+      "service_groups.create",
+      "service_groups.edit",
+      "service_groups.delete",
+    ],
+  },
+  {
+    title: "Services",
+    keys: [
+      "services.view",
+      "services.create",
+      "services.edit",
+      "services.delete",
+    ],
+  },
+  {
+    title: "Pricing",
+    keys: ["pricing.view", "pricing.create", "pricing.edit", "pricing.delete"],
+  },
+  {
+    title: "Room Types",
+    keys: [
+      "room_types.view",
+      "room_types.create",
+      "room_types.edit",
+      "room_types.delete",
+    ],
+  },
+  {
+    title: "Doctors",
+    keys: ["doctors.view", "doctors.create", "doctors.edit", "doctors.delete"],
+  },
   {
     title: "Users",
     keys: ["users.view", "users.create", "users.edit", "users.delete"],
@@ -77,11 +126,12 @@ export default function EditRole() {
 
         const roleData = await readResponse(
           roleResponse,
-          "Unable to load role."
+          "Unable to load role.",
         );
+
         const catalogData = await readResponse(
           catalogResponse,
-          "Unable to load permissions."
+          "Unable to load permissions.",
         );
 
         const items = Array.isArray(catalogData) ? catalogData : [];
@@ -99,15 +149,17 @@ export default function EditRole() {
             items.map((item) => [
               item.key,
               Boolean(roleData.permissions?.[item.key]),
-            ])
-          )
+            ]),
+          ),
         );
       } catch (err) {
         if (!cancelled) {
           setError(err.message || "Unable to load role.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -117,6 +169,25 @@ export default function EditRole() {
       cancelled = true;
     };
   }, [roleId]);
+
+  function togglePermission(key, checked) {
+    setPermissions((current) => ({
+      ...current,
+      [key]: checked,
+    }));
+  }
+
+  function toggleGroup(keys, checked) {
+    setPermissions((current) => {
+      const updated = { ...current };
+
+      keys.forEach((key) => {
+        updated[key] = checked;
+      });
+
+      return updated;
+    });
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -146,6 +217,7 @@ export default function EditRole() {
       });
 
       await readResponse(response, "Unable to update role.");
+
       navigate(`/settings/roles/${roleId}`);
     } catch (err) {
       setError(err.message || "Unable to update role.");
@@ -158,15 +230,10 @@ export default function EditRole() {
     <div className="min-h-screen bg-[#F6F6FC] dark:bg-slate-950">
       <AppSidebar />
 
-      <div className="min-h-screen md:ml-[248px]">
+      <div className="min-h-screen lg:ml-[260px]">
         <TopNavbar
           title="Edit Role"
-          breadcrumb={[
-            "Hospital Management",
-            "Settings",
-            "Roles",
-            "Edit Role",
-          ]}
+          breadcrumb={["Hospital Management", "Settings", "Roles", "Edit Role"]}
         />
 
         <main className="p-4 sm:p-6">
@@ -187,6 +254,7 @@ export default function EditRole() {
               <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
                 Edit Role
               </h1>
+
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Update role details and permissions.
               </p>
@@ -206,6 +274,7 @@ export default function EditRole() {
             </div>
           ) : role ? (
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Role Information */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">
                   Role Information
@@ -219,6 +288,7 @@ export default function EditRole() {
                     >
                       Role Name *
                     </label>
+
                     <input
                       id="role-name"
                       value={name}
@@ -237,12 +307,11 @@ export default function EditRole() {
                     >
                       Status
                     </label>
+
                     <select
                       id="role-status"
                       value={isActive ? "active" : "inactive"}
-                      onChange={(e) =>
-                        setIsActive(e.target.value === "active")
-                      }
+                      onChange={(e) => setIsActive(e.target.value === "active")}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                     >
                       <option value="active">Active</option>
@@ -257,6 +326,7 @@ export default function EditRole() {
                     >
                       Description
                     </label>
+
                     <textarea
                       id="role-description"
                       value={description}
@@ -268,10 +338,12 @@ export default function EditRole() {
                 </div>
               </section>
 
+              {/* Permissions */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="font-semibold text-slate-900 dark:text-white">
                   Permissions
                 </h2>
+
                 <p className="mb-4 mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Select the actions this role can perform.
                 </p>
@@ -284,21 +356,38 @@ export default function EditRole() {
                   <div className="space-y-4">
                     {GROUPS.map((group) => {
                       const items = group.keys
-                        .map((key) =>
-                          catalog.find((item) => item.key === key)
-                        )
+                        .map((key) => catalog.find((item) => item.key === key))
                         .filter(Boolean);
 
                       if (!items.length) return null;
+
+                      const allSelected = items.every((item) =>
+                        Boolean(permissions[item.key]),
+                      );
 
                       return (
                         <div
                           key={group.title}
                           className="rounded-lg border border-slate-200 p-4 dark:border-slate-700"
                         >
-                          <h3 className="mb-3 text-sm font-semibold text-slate-800 dark:text-white">
-                            {group.title}
-                          </h3>
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold text-slate-800 dark:text-white">
+                              {group.title}
+                            </h3>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleGroup(
+                                  items.map((item) => item.key),
+                                  !allSelected,
+                                )
+                              }
+                              className="text-xs font-medium text-[#3E439C] hover:underline dark:text-indigo-300"
+                            >
+                              {allSelected ? "Deselect All" : "Select All"}
+                            </button>
+                          </div>
 
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {items.map((item) => (
@@ -310,13 +399,11 @@ export default function EditRole() {
                                   type="checkbox"
                                   checked={Boolean(permissions[item.key])}
                                   onChange={(e) =>
-                                    setPermissions((current) => ({
-                                      ...current,
-                                      [item.key]: e.target.checked,
-                                    }))
+                                    togglePermission(item.key, e.target.checked)
                                   }
                                   className="mt-1 h-4 w-4 accent-[#3E439C]"
                                 />
+
                                 <span className="text-sm text-slate-700 dark:text-slate-200">
                                   {item.label}
                                 </span>
@@ -330,6 +417,7 @@ export default function EditRole() {
                 )}
               </section>
 
+              {/* Actions */}
               <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
                 <Link
                   to={`/settings/roles/${roleId}`}

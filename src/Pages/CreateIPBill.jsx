@@ -4,14 +4,15 @@ import { useNavigate } from "react-router-dom";
 
 import {
   ArrowLeft,
-  CalendarDays,
   CheckCircle2,
+  FileText,
   Plus,
   ReceiptText,
   Search,
   Trash2,
   UserRound,
-  FolderPlus,
+  BedDouble,
+  RefreshCw,
 } from "lucide-react";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
@@ -27,7 +28,7 @@ import FullPageLoader from "../Components/Common/FullPageLoader";
 import { useToast } from "../Components/Common/useToast";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http\://localhost:8001"
 ).replace(/\/$/, "");
 
 const today = () => {
@@ -38,8 +39,12 @@ const today = () => {
   return local.toISOString().slice(0, 10);
 };
 
+const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 const createCharge = () => ({
-  id: `${Date.now()}-${Math.random()}`,
+  id: makeId(),
+
+  service_id: "",
 
   description: "",
 
@@ -48,12 +53,16 @@ const createCharge = () => ({
   rate: "",
 
   discount_amount: "0",
+
+  priceLoading: false,
+
+  priceError: "",
 });
 
-const createCategory = (name = "") => ({
-  id: `${Date.now()}-${Math.random()}`,
+const createCategory = () => ({
+  id: makeId(),
 
-  name,
+  service_group_id: "",
 
   items: [createCharge()],
 });
@@ -70,6 +79,91 @@ const currency = (amount) =>
   }).format(Number(amount) || 0);
 
 const patientName = (patient) => patient?.name?.trim() || "—";
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+
+    headers: {
+      Accept: "application/json",
+
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+
+      ...options.headers,
+    },
+
+    ...options,
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  const data = contentType.includes("application/json")
+    ? await response.json().catch(() => null)
+    : await response.text().catch(() => "");
+
+  if (!response.ok) {
+    const detail = data?.detail ?? data?.message ?? data;
+
+    const message = Array.isArray(detail)
+      ? detail.map((item) => item.msg || JSON.stringify(item)).join("; ")
+      : typeof detail === "string"
+        ? detail
+        : `Request failed (${response.status})`;
+
+    throw new Error(message || `Request failed (${response.status})`);
+  }
+
+  return data;
+}
+
+function unwrapList(data) {
+  if (Array.isArray(data)) return data;
+
+  if (Array.isArray(data?.items)) return data.items;
+
+  if (Array.isArray(data?.results)) return data.results;
+
+  if (Array.isArray(data?.data)) return data.data;
+
+  return [];
+}
+
+function getId(record) {
+  return record?.id ?? record?.service_id ?? record?.patient_id ?? "";
+}
+
+function getName(record) {
+  return record?.name ?? record?.service_name ?? "";
+}
+
+function getPrice(data) {
+  const candidates = [
+    data?.amount,
+
+    data?.price,
+
+    data?.rate,
+
+    data?.resolved_price,
+
+    data?.service_price?.amount,
+
+    data?.data?.amount,
+
+    data?.data?.price,
+  ];
+
+  const value = candidates.find(
+    (candidate) =>
+      candidate !== undefined && candidate !== null && candidate !== "",
+  );
+
+  if (value === undefined || !Number.isFinite(Number(value))) {
+    throw new Error("The pricing API did not return a valid service price.");
+  }
+
+  return Number(value);
+}
 
 export default function CreateIPBill() {
   const navigate = useNavigate();
@@ -92,17 +186,35 @@ export default function CreateIPBill() {
 
   const [showPatientResults, setShowPatientResults] = useState(false);
 
+  const [doctors, setDoctors] = useState([]);
+
+  const [serviceGroups, setServiceGroups] = useState([]);
+
+  const [services, setServices] = useState([]);
+
+  const [roomTypes, setRoomTypes] = useState([]);
+
+  const [mastersLoading, setMastersLoading] = useState(true);
+
+  const [mastersError, setMastersError] = useState("");
+
   const [admissionDate, setAdmissionDate] = useState(today());
+
   const [dischargeDate, setDischargeDate] = useState("");
+
   const [billDate, setBillDate] = useState(today());
+
   const [department, setDepartment] = useState("");
+
   const [doctorName, setDoctorName] = useState("");
+
   const [bedNumber, setBedNumber] = useState("");
-  const [rateCategory, setRateCategory] = useState("");
 
-  // Categories are created by the billing user.
+  const [roomTypeId, setRoomTypeId] = useState("");
 
-  const [categories, setCategories] = useState([createCategory("")]);
+  const [rateCategory] = useState("General IPD");
+
+  const [categories, setCategories] = useState([createCategory()]);
 
   const [notes, setNotes] = useState("");
 
@@ -114,20 +226,24 @@ export default function CreateIPBill() {
 
   const [savedBill, setSavedBill] = useState(null);
 
-  const [newCategoryName, setNewCategoryName] = useState("");
-
-  const [showCategoryInput, setShowCategoryInput] = useState(false);
-
   const text = dark ? "text-slate-100" : "text-slate-800";
 
   const muted = dark ? "text-slate-400" : "text-slate-500";
 
   const border = dark ? "border-slate-700" : "border-slate-200";
 
+  const panel = dark ? "bg-[#171827]" : "bg-white";
+
   const inputClass = `h-10 w-full min-w-0 rounded-md border px-3 text-sm outline-none transition focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
     dark
       ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
       : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+  }`;
+
+  const readOnlyClass = `h-10 w-full flex items-center min-w-0 rounded-md border px-3 text-sm ${
+    dark
+      ? "border-slate-700 bg-slate-800/70 text-slate-300"
+      : "border-slate-200 bg-slate-50 text-slate-700"
   }`;
 
   const labelClass = `mb-2 block text-[13px] font-medium ${
@@ -141,46 +257,24 @@ export default function CreateIPBill() {
       setPatientsError("");
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/patients?page=1&page_size=100`,
+        const data = await apiRequest("/api/patients?page=1&page_size=100", {
+          signal,
+        });
 
-          {
-            credentials: "include",
-
-            headers: { Accept: "application/json" },
-
-            signal,
-          },
-        );
-
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(
-            data?.detail || "Unable to load registered patients.",
-          );
-        }
-
-        const records = Array.isArray(data) ? data : data?.items;
-
-        if (!Array.isArray(records)) {
-          throw new Error("Unexpected response from the patients API.");
-        }
+        const records = unwrapList(data);
 
         setPatients(records);
       } catch (error) {
         if (error.name === "AbortError") return;
 
-        const message = error.message || "Unable to load patients.";
-
-        setPatientsError(message);
+        setPatientsError(error.message || "Unable to load patients.");
 
         showToast({
           type: "error",
 
           title: "Unable to load patients",
 
-          message,
+          message: error.message || "Please try again.",
 
           duration: 6000,
         });
@@ -192,83 +286,342 @@ export default function CreateIPBill() {
     [showToast],
   );
 
+  const loadMasters = useCallback(async (signal) => {
+    setMastersLoading(true);
+
+    setMastersError("");
+
+    try {
+      const [groupsData, servicesData, roomTypesData, doctorsData] =
+        await Promise.all([
+          apiRequest("/api/service-groups", { signal }),
+
+          apiRequest("/api/services", { signal }),
+
+          apiRequest("/api/room-types", { signal }),
+
+          apiRequest("/api/doctors", { signal }),
+        ]);
+
+      setServiceGroups(
+        unwrapList(groupsData).filter((item) => item.is_active !== false),
+      );
+
+      setServices(
+        unwrapList(servicesData).filter(
+          (item) => item.is_active !== false && item.available_for_ip !== false,
+        ),
+      );
+
+      setRoomTypes(
+        unwrapList(roomTypesData).filter((item) => item.is_active !== false),
+      );
+
+      setDoctors(
+        unwrapList(doctorsData).filter((doctor) => doctor.is_active !== false),
+      );
+    } catch (error) {
+      if (error.name === "AbortError") return;
+
+      setMastersError(
+        error.message ||
+          "Unable to load service groups, services, and room types.",
+      );
+    } finally {
+      if (!signal?.aborted) setMastersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
 
     loadPatients(controller.signal);
 
+    loadMasters(controller.signal);
+
     return () => controller.abort();
-  }, [loadPatients]);
+  }, [loadPatients, loadMasters]);
 
   const filteredPatients = useMemo(() => {
     const query = patientQuery.trim().toLowerCase();
 
-    if (!query) return patients.slice(0, 8);
+    const records = !query
+      ? patients.slice(0, 8)
+      : patients.filter((patient) =>
+          [patientName(patient), patient.patient_id, patient.mobile].some(
+            (value) =>
+              String(value ?? "")
+                .toLowerCase()
 
-    return patients
-
-      .filter((patient) => {
-        const searchable = [
-          patientName(patient),
-
-          patient.patient_id,
-
-          patient.registration_number,
-
-          patient.mobile,
-        ];
-
-        return searchable.some((value) =>
-          String(value ?? "")
-            .toLowerCase()
-            .includes(query),
+                .includes(query),
+          ),
         );
-      })
 
-      .slice(0, 8);
+    return records.slice(0, 8);
   }, [patients, patientQuery]);
 
-  // Calculate individual charges and totals for each category.
+  const getServicesForGroup = useCallback(
+    (groupId) =>
+      services.filter(
+        (service) =>
+          String(service.service_group_id ?? service.group_id ?? "") ===
+          String(groupId),
+      ),
 
-  const categorySummaries = useMemo(() => {
-    return categories.map((category) => {
-      const lines = category.items.map((item) => {
-        const quantity = Math.max(0, Number(item.quantity) || 0);
+    [services],
+  );
 
-        const rate = Math.max(0, Number(item.rate) || 0);
+  const updateCategory = (categoryId, updates) => {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId ? { ...category, ...updates } : category,
+      ),
+    );
 
-        const gross = quantity * rate;
+    setNotice("");
+  };
 
-        const requestedDiscount = Math.max(
-          0,
+  const addCategory = () => {
+    setCategories((current) => [...current, createCategory()]);
 
-          Number(item.discount_amount) || 0,
-        );
+    setNotice("");
+  };
 
-        const discount = Math.min(gross, requestedDiscount);
+  const removeCategory = (categoryId) => {
+    setCategories((current) =>
+      current.length <= 1
+        ? current
+        : current.filter((category) => category.id !== categoryId),
+    );
+  };
+
+  const addCharge = (categoryId) => {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId
+          ? { ...category, items: [...category.items, createCharge()] }
+          : category,
+      ),
+    );
+  };
+
+  const removeCharge = (categoryId, chargeId) => {
+    setCategories((current) =>
+      current.map((category) => {
+        if (category.id !== categoryId) return category;
 
         return {
-          id: item.id,
+          ...category,
 
-          gross,
-
-          discount,
-
-          net: Math.max(0, gross - discount),
+          items:
+            category.items.length === 1
+              ? [createCharge()]
+              : category.items.filter((item) => item.id !== chargeId),
         };
+      }),
+    );
+  };
+
+  const updateCharge = (categoryId, chargeId, updates) => {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+
+              items: category.items.map((item) =>
+                item.id === chargeId ? { ...item, ...updates } : item,
+              ),
+            },
+      ),
+    );
+
+    setNotice("");
+  };
+
+  const resolvePrice = async (categoryId, chargeId, serviceId) => {
+    if (!serviceId) {
+      updateCharge(categoryId, chargeId, {
+        service_id: "",
+
+        description: "",
+
+        rate: "",
+
+        priceLoading: false,
+
+        priceError: "",
       });
 
-      return {
-        id: category.id,
+      return;
+    }
 
-        subtotal: lines.reduce((sum, line) => sum + line.gross, 0),
+    if (!roomTypeId) {
+      updateCharge(categoryId, chargeId, {
+        service_id: serviceId,
 
-        discount: lines.reduce((sum, line) => sum + line.discount, 0),
+        rate: "",
 
-        total: lines.reduce((sum, line) => sum + line.net, 0),
-      };
+        priceLoading: false,
+
+        priceError: "Select a room type before choosing a service.",
+      });
+
+      return;
+    }
+
+    const service = services.find(
+      (item) => String(getId(item)) === String(serviceId),
+    );
+
+    updateCharge(categoryId, chargeId, {
+      service_id: String(serviceId),
+
+      description: getName(service),
+
+      rate: "",
+
+      priceLoading: true,
+
+      priceError: "",
     });
-  }, [categories]);
+
+    try {
+      const params = new URLSearchParams({
+        service_id: String(serviceId),
+
+        bill_type: "IP",
+
+        room_type_id: String(roomTypeId),
+      });
+
+      const data = await apiRequest(
+        `/api/billing/service-price?${params.toString()}`,
+      );
+
+      const amount = getPrice(data);
+
+      updateCharge(categoryId, chargeId, {
+        service_id: String(serviceId),
+
+        description: getName(service),
+
+        rate: String(amount),
+
+        priceLoading: false,
+
+        priceError: "",
+      });
+    } catch (error) {
+      updateCharge(categoryId, chargeId, {
+        service_id: String(serviceId),
+
+        description: getName(service),
+
+        rate: "",
+
+        priceLoading: false,
+
+        priceError:
+          error.message ||
+          "No applicable price exists for this service and room type.",
+      });
+    }
+  };
+
+  // If the room type changes, every selected service must be repriced.
+
+  useEffect(() => {
+    if (!roomTypeId) {
+      setCategories((current) =>
+        current.map((category) => ({
+          ...category,
+
+          items: category.items.map((item) => ({
+            ...item,
+
+            rate: "",
+
+            priceLoading: false,
+
+            priceError: item.service_id
+              ? "Select a room type to retrieve the price."
+              : "",
+          })),
+        })),
+      );
+
+      return;
+    }
+
+    const selected = categories.flatMap((category) =>
+      category.items
+
+        .filter((item) => item.service_id)
+
+        .map((item) => ({
+          categoryId: category.id,
+
+          chargeId: item.id,
+
+          serviceId: item.service_id,
+        })),
+    );
+
+    selected.forEach((item) =>
+      resolvePrice(item.categoryId, item.chargeId, item.serviceId),
+    );
+
+    // Only run on room type changes. resolvePrice intentionally uses current
+
+    // master data and selected room type from this render.
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomTypeId]);
+
+  const categorySummaries = useMemo(
+    () =>
+      categories.map((category) => {
+        const lines = category.items.map((item) => {
+          const quantity = Math.max(0, Number(item.quantity) || 0);
+
+          const rate = Math.max(0, Number(item.rate) || 0);
+
+          const gross = quantity * rate;
+
+          const requestedDiscount = Math.max(
+            0,
+
+            Number(item.discount_amount) || 0,
+          );
+
+          const discount = Math.min(gross, requestedDiscount);
+
+          return {
+            id: item.id,
+
+            gross,
+
+            discount,
+
+            net: Math.max(0, gross - discount),
+          };
+        });
+
+        return {
+          id: category.id,
+
+          subtotal: lines.reduce((sum, line) => sum + line.gross, 0),
+
+          discount: lines.reduce((sum, line) => sum + line.discount, 0),
+
+          total: lines.reduce((sum, line) => sum + line.net, 0),
+        };
+      }),
+
+    [categories],
+  );
 
   const billSummary = useMemo(() => {
     const subtotal = categorySummaries.reduce(
@@ -292,133 +645,6 @@ export default function CreateIPBill() {
     };
   }, [categorySummaries]);
 
-  const updateCategoryName = (categoryId, name) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id === categoryId ? { ...category, name } : category,
-      ),
-    );
-
-    setNotice("");
-  };
-
-  const addCategory = () => {
-    const name = newCategoryName.trim();
-
-    if (!name) {
-      showToast({
-        type: "warning",
-
-        title: "Category name required",
-
-        message: "Enter a name for the new category.",
-      });
-
-      return;
-    }
-
-    const duplicate = categories.some(
-      (category) => category.name.trim().toLowerCase() === name.toLowerCase(),
-    );
-
-    if (duplicate) {
-      showToast({
-        type: "warning",
-
-        title: "Category already exists",
-
-        message: "Please use a different category name.",
-      });
-
-      return;
-    }
-
-    setCategories((current) => [...current, createCategory(name)]);
-
-    setNewCategoryName("");
-
-    setShowCategoryInput(false);
-
-    setNotice("");
-
-    showToast({
-      type: "success",
-
-      title: "Category added",
-
-      message: `${name} has been added.`,
-    });
-  };
-
-  const removeCategory = (categoryId) => {
-    if (categories.length === 1) {
-      showToast({
-        type: "warning",
-
-        title: "At least one category is required",
-
-        message: "Rename this category instead of removing it.",
-      });
-
-      return;
-    }
-
-    setCategories((current) =>
-      current.filter((category) => category.id !== categoryId),
-    );
-
-    setNotice("");
-  };
-
-  const addCharge = (categoryId) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id === categoryId
-          ? {
-              ...category,
-
-              items: [...category.items, createCharge()],
-            }
-          : category,
-      ),
-    );
-  };
-
-  const updateCharge = (categoryId, chargeId, field, value) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id === categoryId
-          ? {
-              ...category,
-
-              items: category.items.map((item) =>
-                item.id === chargeId ? { ...item, [field]: value } : item,
-              ),
-            }
-          : category,
-      ),
-    );
-
-    setNotice("");
-  };
-
-  const removeCharge = (categoryId, chargeId) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id === categoryId
-          ? {
-              ...category,
-
-              items:
-                category.items.length === 1
-                  ? [createCharge()]
-                  : category.items.filter((item) => item.id !== chargeId),
-            }
-          : category,
-      ),
-    );
-  };
-
   const selectPatient = (patient) => {
     setSelectedPatient(patient);
 
@@ -430,120 +656,54 @@ export default function CreateIPBill() {
   };
 
   const validateForm = () => {
-    if (!selectedPatient) {
-      setNotice("Please select a registered patient.");
+    const fail = (message) => {
+      setNotice(message);
 
       setNoticeType("error");
 
       showToast({
         type: "warning",
 
-        title: "Patient required",
+        title: "Check bill details",
 
-        message: "Please select a registered patient.",
+        message,
       });
 
       return false;
-    }
+    };
+
+    if (!selectedPatient) return fail("Please select a registered patient.");
 
     if (!admissionDate || !billDate) {
-      setNotice("Please select the admission date and bill date.");
-
-      setNoticeType("error");
-
-      showToast({
-        type: "warning",
-
-        title: "Date required",
-
-        message: "Please select both dates.",
-      });
-
-      return false;
+      return fail("Please select the admission date and bill date.");
     }
 
     if (dischargeDate && dischargeDate < admissionDate) {
-      setNotice("Discharge date cannot be earlier than admission date.");
-      setNoticeType("error");
-      showToast({
-        type: "warning",
-        title: "Invalid discharge date",
-        message: "Discharge date cannot be earlier than admission date.",
-      });
-      return false;
+      return fail("Discharge date cannot be earlier than admission date.");
     }
 
-    if (categories.length === 0) {
-      setNotice("Please add at least one category.");
+    if (!roomTypeId) return fail("Please select an IP room type.");
 
-      setNoticeType("error");
-
-      return false;
-    }
-
-    const categoryNames = categories.map((category) =>
-      category.name.trim().toLowerCase(),
+    const items = categories.flatMap((category) =>
+      category.items.filter((item) => item.service_id),
     );
 
-    if (categories.some((category) => !category.name.trim())) {
-      setNotice("Please enter a name for every category.");
-
-      setNoticeType("error");
-
-      showToast({
-        type: "warning",
-
-        title: "Category name required",
-
-        message: "Every category must have a name.",
-      });
-
-      return false;
+    if (items.length === 0) {
+      return fail("Add at least one service to the IP bill.");
     }
 
-    if (new Set(categoryNames).size !== categoryNames.length) {
-      setNotice("Category names must be unique.");
+    for (const item of items) {
+      if (item.priceLoading) {
+        return fail("Wait for all service prices to finish loading.");
+      }
 
-      setNoticeType("error");
+      if (item.priceError || item.rate === "") {
+        return fail(
+          item.priceError ||
+            "A service price is missing. Re-select the service to retry.",
+        );
+      }
 
-      showToast({
-        type: "warning",
-
-        title: "Duplicate category",
-
-        message: "Please give each category a unique name.",
-      });
-
-      return false;
-    }
-
-    const allItems = categories.flatMap((category) =>
-      category.items.map((item) => ({
-        ...item,
-
-        categoryName: category.name.trim(),
-      })),
-    );
-
-    const completedItems = allItems.filter((item) => item.description.trim());
-
-    if (completedItems.length === 0) {
-      setNotice("Please add at least one service or charge.");
-
-      setNoticeType("error");
-
-      showToast({
-        type: "warning",
-
-        title: "Charge required",
-
-        message: "Add at least one charge with a description.",
-      });
-
-      return false;
-    }
-
-    const invalidItem = completedItems.some((item) => {
       const quantity = Number(item.quantity);
 
       const rate = Number(item.rate);
@@ -552,52 +712,23 @@ export default function CreateIPBill() {
 
       const gross = quantity * rate;
 
-      return (
-        item.quantity === "" ||
-        !Number.isFinite(quantity) ||
-        quantity <= 0 ||
-        item.rate === "" ||
-        !Number.isFinite(rate) ||
-        rate < 0 ||
-        !Number.isFinite(discount) ||
-        discount < 0 ||
-        discount > gross
-      );
-    });
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return fail("Each service quantity must be greater than zero.");
+      }
 
-    if (invalidItem) {
-      setNotice(
-        "Check each charge's quantity, rate and discount. A discount cannot exceed its charge amount.",
-      );
+      if (!Number.isFinite(rate) || rate < 0) {
+        return fail("A valid backend service price is required.");
+      }
 
-      setNoticeType("error");
-
-      showToast({
-        type: "warning",
-
-        title: "Invalid charge details",
-
-        message:
-          "Quantity must be positive, and each discount must be between zero and the charge amount.",
-      });
-
-      return false;
+      if (!Number.isFinite(discount) || discount < 0 || discount > gross) {
+        return fail(
+          "Each discount must be non-negative and cannot exceed the charge amount.",
+        );
+      }
     }
 
     if (billSummary.total <= 0) {
-      setNotice("The final bill amount must be greater than zero.");
-
-      setNoticeType("error");
-
-      showToast({
-        type: "warning",
-
-        title: "Invalid bill total",
-
-        message: "The final payable amount must be greater than zero.",
-      });
-
-      return false;
+      return fail("The final bill amount must be greater than zero.");
     }
 
     return true;
@@ -606,27 +737,19 @@ export default function CreateIPBill() {
   const handleGenerateBill = async (event) => {
     event.preventDefault();
 
-    if (isSubmitting || savedBill) return;
-
-    if (!validateForm()) return;
+    if (isSubmitting || savedBill || !validateForm()) return;
 
     const items = categories.flatMap((category) =>
       category.items
 
-        .filter((item) => item.description.trim())
+        .filter((item) => item.service_id)
 
         .map((item) => ({
-          // The backend must support this category field
+          service_id: Number(item.service_id),
 
-          // to preserve the grouping after the bill is saved.
-
-          category: category.name.trim(),
-
-          description: item.description.trim(),
+          service_date: billDate,
 
           quantity: Number(item.quantity),
-
-          rate: Number(item.rate),
 
           discount_amount: Number(item.discount_amount || 0),
         })),
@@ -638,14 +761,25 @@ export default function CreateIPBill() {
       patient_id: selectedPatient.patient_id,
 
       bill_date: `${billDate}T00:00:00`,
+
       admission_date: `${admissionDate}T00:00:00`,
+
       discharge_date: dischargeDate ? `${dischargeDate}T00:00:00` : null,
+
       department: department.trim() || null,
+
       doctor_name: doctorName.trim() || null,
+
       bed_number: bedNumber.trim() || null,
-      rate_category: rateCategory.trim() || null,
+
+      room_type_id: Number(roomTypeId),
+
+      rate_category: "General IPD",
+
       discount_amount: 0,
+
       notes: notes.trim() || null,
+
       items,
     };
 
@@ -653,36 +787,12 @@ export default function CreateIPBill() {
 
     setNotice("");
 
-    setNoticeType("error");
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/bills`, {
+      const data = await apiRequest("/api/bills", {
         method: "POST",
-
-        credentials: "include",
-
-        headers: {
-          Accept: "application/json",
-
-          "Content-Type": "application/json",
-        },
 
         body: JSON.stringify(payload),
       });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const detail = data?.detail;
-
-        const message = Array.isArray(detail)
-          ? detail.map((item) => item.msg || "Invalid request").join("; ")
-          : typeof detail === "string"
-            ? detail
-            : "Unable to save the bill. Check the details and try again.";
-
-        throw new Error(message);
-      }
 
       setSavedBill(data);
 
@@ -704,10 +814,7 @@ export default function CreateIPBill() {
         }was saved successfully.`,
       });
     } catch (error) {
-      setNotice(
-        error.message ||
-          "Unable to connect to the billing server. Check the API URL and try again.",
-      );
+      setNotice(error.message || "Unable to save the bill.");
 
       setNoticeType("error");
 
@@ -716,10 +823,7 @@ export default function CreateIPBill() {
 
         title: "Bill creation failed",
 
-        message:
-          error instanceof TypeError
-            ? "Unable to connect to the billing server. Check the API URL and try again."
-            : error.message || "Unable to save the bill.",
+        message: error.message || "Unable to save the bill.",
 
         duration: 6000,
       });
@@ -765,7 +869,8 @@ export default function CreateIPBill() {
                   </h1>
 
                   <p className={`mt-1 text-[13px] ${muted}`}>
-                    Create categories and add inpatient charges
+                    Select service groups and add room-specific inpatient
+                    charges.
                   </p>
                 </div>
               </div>
@@ -779,6 +884,30 @@ export default function CreateIPBill() {
                 Back to IP Bills
               </button>
             </div>
+
+            {mastersError && (
+              <div className="mb-5 flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <span>{mastersError}</span>
+
+                <button
+                  type="button"
+                  onClick={() => loadMasters()}
+                  className="font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {mastersLoading && (
+              <div className={`mb-5 rounded-lg border p-4 ${border} ${panel}`}>
+                <Loader
+                  variant="button"
+                  size="sm"
+                  message="Loading pricing configuration..."
+                />
+              </div>
+            )}
 
             <form onSubmit={handleGenerateBill} className="space-y-7">
               {/* Patient and admission details */}
@@ -828,17 +957,11 @@ export default function CreateIPBill() {
                         />
 
                         <div
-                          className={`absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border shadow-lg ${border} ${
-                            dark ? "bg-[#171827]" : "bg-white"
-                          }`}
+                          className={`absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border shadow-lg ${border} ${panel}`}
                         >
                           {patientsLoading ? (
                             <div className={`p-3 text-sm ${muted}`}>
-                              <Loader
-                                variant="button"
-                                size="sm"
-                                message="Loading patients..."
-                              />
+                              Loading patients...
                             </div>
                           ) : patientsError ? (
                             <div className="p-3 text-sm text-red-500">
@@ -888,572 +1011,504 @@ export default function CreateIPBill() {
                   <div>
                     <label className={labelClass}>Patient ID / UHID</label>
 
-                    <div className={`${inputClass} flex items-center`}>
+                    <div className={`${readOnlyClass} flex items-center`}>
                       {selectedPatient?.patient_id || "Select a patient"}
                     </div>
                   </div>
-
                   <div>
-                    <label className={labelClass}>Registration Number</label>
+                    <label className={labelClass}>Patient Name</label>
 
-                    <div className={`${inputClass} flex items-center`}>
-                      {selectedPatient?.registration_number || "—"}
+                    <div className={`${readOnlyClass} flex items-center`}>
+                      {selectedPatient ? patientName(selectedPatient) : "—"}
                     </div>
                   </div>
 
                   <div>
                     <label className={labelClass}>Mobile Number</label>
 
-                    <div className={`${inputClass} flex items-center`}>
+                    <div className={`${readOnlyClass} flex items-center`}>
                       {selectedPatient?.mobile || "—"}
                     </div>
                   </div>
 
                   <div>
-                    <label className={labelClass}>Patient Name</label>
+                    <label className={labelClass}>Department</label>
 
-                    <div className={`${inputClass} flex items-center`}>
-                      {selectedPatient ? patientName(selectedPatient) : "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="admissionDate" className={labelClass}>
-                      Admission Date *
-                    </label>
-
-                    <div className="relative">
-                      <CalendarDays
-                        size={16}
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
-                      />
-
-                      <input
-                        id="admissionDate"
-                        type="date"
-                        value={admissionDate}
-                        onChange={(event) =>
-                          setAdmissionDate(event.target.value)
-                        }
-                        className={`${inputClass} pl-9`}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="billDate" className={labelClass}>
-                      Bill Date *
-                    </label>
-
-                    <div className="relative">
-                      <CalendarDays
-                        size={16}
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
-                      />
-
-                      <input
-                        id="billDate"
-                        type="date"
-                        value={billDate}
-                        onChange={(event) => setBillDate(event.target.value)}
-                        className={`${inputClass} pl-9`}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="dischargeDate" className={labelClass}>
-                      Discharge Date
-                    </label>
-                    <div className="relative">
-                      <CalendarDays
-                        size={16}
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
-                      />
-                      <input
-                        id="dischargeDate"
-                        type="date"
-                        value={dischargeDate}
-                        min={admissionDate || undefined}
-                        onChange={(event) =>
-                          setDischargeDate(event.target.value)
-                        }
-                        className={`${inputClass} pl-9`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="department" className={labelClass}>
-                      Department / Ward
-                    </label>
                     <input
-                      id="department"
                       value={department}
                       onChange={(event) => setDepartment(event.target.value)}
-                      placeholder="Enter department or ward"
+                      placeholder="Department"
                       className={inputClass}
                     />
                   </div>
+
                   <div>
-                    <label htmlFor="doctorName" className={labelClass}>
-                      Attending Doctor
-                    </label>
-                    <input
-                      id="doctorName"
+                    <label className={labelClass}>Doctor Name (optional)</label>
+
+                    <select
                       value={doctorName}
                       onChange={(event) => setDoctorName(event.target.value)}
-                      placeholder="Enter doctor name"
+                      className={inputClass}
+                    >
+                      <option value="">Select doctor</option>
+
+                      {doctors.map((doctor) => (
+                        <option key={getId(doctor)} value={getName(doctor)}>
+                          {getName(doctor)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Admission Date *</label>
+
+                    <input
+                      type="date"
+                      value={admissionDate}
+                      onChange={(event) => setAdmissionDate(event.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Discharge Date</label>
+
+                    <input
+                      type="date"
+                      value={dischargeDate}
+                      min={admissionDate}
+                      onChange={(event) => setDischargeDate(event.target.value)}
                       className={inputClass}
                     />
                   </div>
+
                   <div>
-                    <label htmlFor="bedNumber" className={labelClass}>
-                      Bed Number
-                    </label>
+                    <label className={labelClass}>Bill Date *</label>
+
                     <input
-                      id="bedNumber"
+                      type="date"
+                      value={billDate}
+                      onChange={(event) => setBillDate(event.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Room Type *</label>
+
+                    <select
+                      value={roomTypeId}
+                      onChange={(event) => setRoomTypeId(event.target.value)}
+                      className={inputClass}
+                      required
+                    >
+                      <option value="">Select room type</option>
+
+                      {roomTypes.map((room) => (
+                        <option key={getId(room)} value={getId(room)}>
+                          {getName(room)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className={`mt-1 text-xs ${muted}`}>
+                      Service prices are resolved using this room type.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Bed Number</label>
+
+                    <input
                       value={bedNumber}
                       onChange={(event) => setBedNumber(event.target.value)}
-                      placeholder="Enter bed number"
+                      placeholder="e.g. B-102"
                       className={inputClass}
                     />
                   </div>
+
                   <div>
-                    <label htmlFor="rateCategory" className={labelClass}>
-                      Rate Category
-                    </label>
-                    <input
-                      id="rateCategory"
-                      value={rateCategory}
-                      onChange={(event) => setRateCategory(event.target.value)}
-                      placeholder="Enter rate category"
-                      className={inputClass}
-                    />
+                    <label className={labelClass}>Rate Category</label>
+
+                    <div className={readOnlyClass} aria-readonly="true">
+                      General IPD
+                    </div>
                   </div>
                 </div>
               </section>
 
-              {/* User-created categories */}
+              {/* Service groups and services */}
 
-              <section>
+              <section className={`border-b pb-6 ${border}`}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className={`text-sm font-semibold ${text}`}>
-                      Inpatient Categories & Charges
+                      Service Groups & Charges
                     </h2>
 
                     <p className={`mt-1 text-xs ${muted}`}>
-                      Create your own categories and group related charges.
+                      Add multiple groups. Each service dropdown only shows
+                      services belonging to its selected group.
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => setShowCategoryInput((current) => !current)}
-                    className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-medium text-white hover:bg-[#323780]"
+                    onClick={addCategory}
+                    className="inline-flex h-9 items-center gap-2 rounded-md bg-[#3E439C] px-3 text-sm font-medium text-white hover:bg-[#323780]"
                   >
-                    <FolderPlus size={16} />
-                    Add Category
+                    <Plus size={16} />
+                    Add Service Group
                   </button>
                 </div>
 
-                {showCategoryInput && (
-                  <div
-                    className={`mb-5 rounded-lg border p-4 ${border} ${
-                      dark ? "bg-[#171827]" : "bg-white"
-                    }`}
-                  >
-                    <label htmlFor="newCategoryName" className={labelClass}>
-                      New Category Name *
-                    </label>
+                {categories.map((category, categoryIndex) => {
+                  const summary = categorySummaries.find(
+                    (item) => item.id === category.id,
+                  );
 
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <input
-                        id="newCategoryName"
-                        value={newCategoryName}
-                        onChange={(event) =>
-                          setNewCategoryName(event.target.value)
-                        }
-                        placeholder="e.g. Room Charges, Clinical Charges"
-                        className={inputClass}
-                        autoFocus
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
+                  const groupServices = getServicesForGroup(
+                    category.service_group_id,
+                  );
 
-                            addCategory();
-                          }
-                        }}
-                      />
+                  return (
+                    <div
+                      key={category.id}
+                      className={`mb-5 rounded-lg border p-4 last:mb-0 sm:p-5 ${border} ${panel}`}
+                    >
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <h3 className={`text-sm font-semibold ${text}`}>
+                          Service Group {categoryIndex + 1}
+                        </h3>
 
-                      <button
-                        type="button"
-                        onClick={addCategory}
-                        className="h-10 shrink-0 rounded-md bg-[#3E439C] px-4 text-sm font-medium text-white hover:bg-[#323780]"
-                      >
-                        Create Category
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCategoryInput(false);
-
-                          setNewCategoryName("");
-                        }}
-                        className={`flex h-10 items-center justify-center rounded-md border px-3 ${border} ${text}`}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-5">
-                  {categories.map((category, categoryIndex) => {
-                    const summary = categorySummaries.find(
-                      (item) => item.id === category.id,
-                    );
-
-                    return (
-                      <div
-                        key={category.id}
-                        className={`overflow-hidden rounded-lg border ${border} ${
-                          dark ? "bg-[#171827]" : "bg-white"
-                        }`}
-                      >
-                        <div
-                          className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 ${border} ${
-                            dark ? "bg-slate-800/50" : "bg-[#F8F8FD]"
-                          }`}
+                        <button
+                          type="button"
+                          onClick={() => removeCategory(category.id)}
+                          disabled={categories.length === 1}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/30"
                         >
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
-                              <ReceiptText
-                                size={17}
-                                className="text-[#3E439C] dark:text-[#D6D4FF]"
-                              />
-                            </div>
+                          <Trash2 size={14} />
+                          Remove Group
+                        </button>
+                      </div>
 
-                            <div className="min-w-0 flex-1">
-                              <label
-                                htmlFor={`category-${category.id}`}
-                                className={`mb-1 block text-xs ${muted}`}
-                              >
-                                Category {categoryIndex + 1} Name *
-                              </label>
+                      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <label className={labelClass}>Service Group *</label>
 
-                              <input
-                                id={`category-${category.id}`}
-                                value={category.name}
-                                onChange={(event) =>
-                                  updateCategoryName(
-                                    category.id,
+                          <select
+                            value={category.service_group_id}
+                            onChange={(event) => {
+                              updateCategory(category.id, {
+                                service_group_id: event.target.value,
 
-                                    event.target.value,
-                                  )
-                                }
-                                placeholder="Enter category name"
-                                className={`${inputClass} max-w-md font-semibold`}
-                                required
-                              />
-                            </div>
-                          </div>
+                                items: category.items.map((item) => ({
+                                  ...item,
 
-                          <button
-                            type="button"
-                            onClick={() => removeCategory(category.id)}
-                            aria-label="Remove category"
-                            title="Remove category"
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-red-200 px-3 text-sm text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                                  service_id: "",
+
+                                  description: "",
+
+                                  rate: "",
+
+                                  priceLoading: false,
+
+                                  priceError: "",
+                                })),
+                              });
+                            }}
+                            className={inputClass}
+                            required
                           >
-                            <Trash2 size={15} />
-                            Remove Category
-                          </button>
+                            <option value="">Select service group</option>
+
+                            {serviceGroups.map((group) => (
+                              <option key={getId(group)} value={getId(group)}>
+                                {getName(group)}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        <div className="p-4">
-                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <h3 className={`text-sm font-semibold ${text}`}>
-                              Charges
-                            </h3>
-
-                            <button
-                              type="button"
-                              onClick={() => addCharge(category.id)}
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#3E439C] px-3 text-sm font-medium text-[#3E439C] hover:bg-[#F1F0FF] dark:text-[#D6D4FF] dark:hover:bg-[#292B49]"
-                            >
-                              <Plus size={15} />
-                              Add Charge
-                            </button>
-                          </div>
-
-                          <div
-                            className={`overflow-x-auto rounded-md border ${border}`}
-                          >
-                            <table className="w-full min-w-[950px] text-sm">
-                              <thead
-                                className={
-                                  dark
-                                    ? "bg-slate-800/70 text-slate-300"
-                                    : "bg-slate-50 text-slate-600"
-                                }
-                              >
-                                <tr>
-                                  <th className="px-3 py-3 text-left text-xs font-semibold">
-                                    Service / Charge
-                                  </th>
-
-                                  <th className="w-24 px-3 py-3 text-right text-xs font-semibold">
-                                    Quantity
-                                  </th>
-
-                                  <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
-                                    Rate (₹)
-                                  </th>
-
-                                  <th className="w-36 px-3 py-3 text-right text-xs font-semibold">
-                                    Gross Amount
-                                  </th>
-
-                                  <th className="w-36 px-3 py-3 text-right text-xs font-semibold">
-                                    Discount (₹)
-                                  </th>
-
-                                  <th className="w-36 px-3 py-3 text-right text-xs font-semibold">
-                                    Net Amount
-                                  </th>
-
-                                  <th className="w-12 px-2 py-3" />
-                                </tr>
-                              </thead>
-
-                              <tbody>
-                                {category.items.map((item) => {
-                                  const gross =
-                                    Math.max(
-                                      0,
-
-                                      Number(item.quantity) || 0,
-                                    ) * Math.max(0, Number(item.rate) || 0);
-
-                                  const discount = Math.min(
-                                    gross,
-
-                                    Math.max(
-                                      0,
-
-                                      Number(item.discount_amount) || 0,
-                                    ),
-                                  );
-
-                                  const net = Math.max(0, gross - discount);
-
-                                  return (
-                                    <tr
-                                      key={item.id}
-                                      className={`border-t ${border}`}
-                                    >
-                                      <td className="px-3 py-2.5">
-                                        <input
-                                          value={item.description}
-                                          onChange={(event) =>
-                                            updateCharge(
-                                              category.id,
-
-                                              item.id,
-
-                                              "description",
-
-                                              event.target.value,
-                                            )
-                                          }
-                                          placeholder="Enter service or charge"
-                                          className={inputClass}
-                                        />
-                                      </td>
-
-                                      <td className="px-3 py-2.5">
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          step="1"
-                                          value={item.quantity}
-                                          onChange={(event) =>
-                                            updateCharge(
-                                              category.id,
-
-                                              item.id,
-
-                                              "quantity",
-
-                                              event.target.value,
-                                            )
-                                          }
-                                          className={`${inputClass} text-right`}
-                                        />
-                                      </td>
-
-                                      <td className="px-3 py-2.5">
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          value={item.rate}
-                                          onChange={(event) =>
-                                            updateCharge(
-                                              category.id,
-
-                                              item.id,
-
-                                              "rate",
-
-                                              event.target.value,
-                                            )
-                                          }
-                                          placeholder="0.00"
-                                          className={`${inputClass} text-right`}
-                                        />
-                                      </td>
-
-                                      <td
-                                        className={`px-3 py-2.5 text-right ${text}`}
-                                      >
-                                        {currency(gross)}
-                                      </td>
-
-                                      <td className="px-3 py-2.5">
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max={gross}
-                                          step="0.01"
-                                          value={item.discount_amount}
-                                          onChange={(event) =>
-                                            updateCharge(
-                                              category.id,
-
-                                              item.id,
-
-                                              "discount_amount",
-
-                                              event.target.value,
-                                            )
-                                          }
-                                          aria-label={`Discount for ${
-                                            item.description || "this charge"
-                                          }`}
-                                          className={`${inputClass} text-right`}
-                                        />
-
-                                        {Number(item.discount_amount) >
-                                          gross && (
-                                          <p className="mt-1 text-[11px] text-red-500">
-                                            Exceeds amount
-                                          </p>
-                                        )}
-                                      </td>
-
-                                      <td
-                                        className={`px-3 py-2.5 text-right font-semibold ${text}`}
-                                      >
-                                        {currency(net)}
-                                      </td>
-
-                                      <td className="px-2 py-2.5 text-center">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            removeCharge(
-                                              category.id,
-
-                                              item.id,
-                                            )
-                                          }
-                                          aria-label="Remove charge"
-                                          title="Remove charge"
-                                          className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                                        >
-                                          <Trash2 size={15} />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-
-                          <div
-                            className={`mt-4 grid grid-cols-1 gap-3 rounded-md border p-3 sm:grid-cols-3 ${border}`}
-                          >
-                            <div>
-                              <p className={`text-xs ${muted}`}>
-                                Category Subtotal
-                              </p>
-
-                              <p
-                                className={`mt-1 text-sm font-semibold ${text}`}
-                              >
-                                {currency(summary?.subtotal || 0)}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className={`text-xs ${muted}`}>
-                                Category Discount
-                              </p>
-
-                              <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
-                                − {currency(summary?.discount || 0)}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className={`text-xs ${muted}`}>
-                                Category Total
-                              </p>
-
-                              <p className="mt-1 text-sm font-bold text-[#3E439C] dark:text-[#B9B7FF]">
-                                {currency(summary?.total || 0)}
-                              </p>
-                            </div>
-                          </div>
+                        <div className="flex items-end">
+                          <p className={`text-xs ${muted}`}>
+                            {category.service_group_id
+                              ? `${groupServices.length} available IP service(s) in this group.`
+                              : "Select a service group to load its services."}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryInput(true)}
-                  className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-4 text-sm font-medium text-[#3E439C] hover:bg-[#F1F0FF] dark:text-[#D6D4FF] dark:hover:bg-[#292B49] ${border}`}
-                >
-                  <FolderPlus size={17} />
-                  Add Another Category
-                </button>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[850px] border-collapse text-sm">
+                          <thead>
+                            <tr
+                              className={
+                                dark ? "bg-slate-800/70" : "bg-slate-50"
+                              }
+                            >
+                              <th
+                                className={`px-3 py-3 text-left font-medium ${muted}`}
+                              >
+                                Service *
+                              </th>
+
+                              <th
+                                className={`w-24 px-3 py-3 text-right font-medium ${muted}`}
+                              >
+                                Quantity
+                              </th>
+
+                              <th
+                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                              >
+                                Rate (₹)
+                              </th>
+
+                              <th
+                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                              >
+                                Amount
+                              </th>
+
+                              <th
+                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                              >
+                                Discount (₹)
+                              </th>
+
+                              <th
+                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                              >
+                                Net Amount
+                              </th>
+
+                              <th className="w-12 px-2 py-3" />
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {category.items.map((item) => {
+                              const quantity = Math.max(
+                                0,
+
+                                Number(item.quantity) || 0,
+                              );
+
+                              const rate = Math.max(0, Number(item.rate) || 0);
+
+                              const gross = quantity * rate;
+
+                              const discount = Math.min(
+                                gross,
+
+                                Math.max(0, Number(item.discount_amount) || 0),
+                              );
+
+                              const net = Math.max(0, gross - discount);
+
+                              return (
+                                <tr
+                                  key={item.id}
+                                  className={`border-t ${border}`}
+                                >
+                                  <td className="px-3 py-3">
+                                    <select
+                                      value={item.service_id}
+                                      disabled={
+                                        !category.service_group_id ||
+                                        !roomTypeId ||
+                                        item.priceLoading
+                                      }
+                                      onChange={(event) =>
+                                        resolvePrice(
+                                          category.id,
+
+                                          item.id,
+
+                                          event.target.value,
+                                        )
+                                      }
+                                      className={inputClass}
+                                      required
+                                    >
+                                      <option value="">
+                                        {!category.service_group_id
+                                          ? "Select group first"
+                                          : !roomTypeId
+                                            ? "Select room type first"
+                                            : "Select service"}
+                                      </option>
+
+                                      {groupServices.map((service) => (
+                                        <option
+                                          key={getId(service)}
+                                          value={getId(service)}
+                                        >
+                                          {getName(service)}
+                                        </option>
+                                      ))}
+                                    </select>
+
+                                    {item.priceLoading && (
+                                      <p
+                                        className={`mt-1 flex items-center gap-1 text-xs ${muted}`}
+                                      >
+                                        <RefreshCw
+                                          size={12}
+                                          className="animate-spin"
+                                        />
+                                        Fetching room-specific price...
+                                      </p>
+                                    )}
+
+                                    {item.priceError && (
+                                      <p className="mt-1 text-xs text-red-500">
+                                        {item.priceError}
+                                      </p>
+                                    )}
+                                  </td>
+
+                                  <td className="px-3 py-3">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={item.quantity}
+                                      onChange={(event) =>
+                                        updateCharge(category.id, item.id, {
+                                          quantity: event.target.value,
+                                        })
+                                      }
+                                      className={`${inputClass} text-right`}
+                                      required
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-3">
+                                    <input
+                                      type="number"
+                                      value={item.rate}
+                                      readOnly
+                                      aria-readonly="true"
+                                      placeholder={
+                                        item.priceLoading ? "Loading..." : "—"
+                                      }
+                                      className={`${readOnlyClass} text-right`}
+                                      title="Rate is populated by the backend and cannot be edited."
+                                    />
+                                  </td>
+
+                                  <td
+                                    className={`px-3 py-3 text-right ${text}`}
+                                  >
+                                    {currency(gross)}
+                                  </td>
+
+                                  <td className="px-3 py-3">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={gross}
+                                      step="0.01"
+                                      value={item.discount_amount}
+                                      onChange={(event) =>
+                                        updateCharge(category.id, item.id, {
+                                          discount_amount: event.target.value,
+                                        })
+                                      }
+                                      className={`${inputClass} text-right`}
+                                    />
+                                  </td>
+
+                                  <td
+                                    className={`px-3 py-3 text-right font-semibold ${text}`}
+                                  >
+                                    {currency(net)}
+                                  </td>
+
+                                  <td className="px-2 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeCharge(category.id, item.id)
+                                      }
+                                      title="Remove service"
+                                      aria-label="Remove service"
+                                      className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => addCharge(category.id)}
+                        className={`mt-3 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium text-[#3E439C] hover:bg-[#F1F0FF] dark:text-[#D6D4FF] dark:hover:bg-[#292B49] ${border}`}
+                      >
+                        <Plus size={14} />
+                        Add Service
+                      </button>
+
+                      <div
+                        className={`mt-4 grid grid-cols-1 gap-3 rounded-md border p-3 sm:grid-cols-3 ${border}`}
+                      >
+                        <div>
+                          <p className={`text-xs ${muted}`}>Group Subtotal</p>
+
+                          <p className={`mt-1 text-sm font-semibold ${text}`}>
+                            {currency(summary?.subtotal || 0)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className={`text-xs ${muted}`}>Group Discount</p>
+
+                          <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
+                            − {currency(summary?.discount || 0)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className={`text-xs ${muted}`}>Group Total</p>
+
+                          <p className="mt-1 text-sm font-bold text-[#3E439C] dark:text-[#B9B7FF]">
+                            {currency(summary?.total || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </section>
 
-              {/* Notes and overall bill summary */}
+              {/* Notes and bill summary */}
 
               <section className="grid grid-cols-1 gap-7 lg:grid-cols-2">
                 <div>
                   <div className="mb-4 flex items-center gap-2">
-                    <ReceiptText size={17} className="text-[#3E439C]" />
+                    <FileText size={17} className="text-[#3E439C]" />
 
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Billing Notes
                     </h2>
                   </div>
 
-                  <label htmlFor="notes" className={labelClass}>
+                  <label htmlFor="ip-bill-notes" className={labelClass}>
                     Notes (optional)
                   </label>
 
                   <textarea
-                    id="notes"
+                    id="ip-bill-notes"
                     rows={4}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
@@ -1467,9 +1522,7 @@ export default function CreateIPBill() {
                 </div>
 
                 <div
-                  className={`rounded-lg border p-4 sm:p-5 ${border} ${
-                    dark ? "bg-[#171827]" : "bg-white"
-                  }`}
+                  className={`rounded-lg border p-4 sm:p-5 ${border} ${panel}`}
                 >
                   <h2 className={`mb-4 text-sm font-semibold ${text}`}>
                     Overall Bill Summary
@@ -1477,21 +1530,20 @@ export default function CreateIPBill() {
 
                   <div className="space-y-4">
                     <div className={`flex justify-between text-sm ${muted}`}>
-                      <span>Total Categories</span>
+                      <span>Service Groups</span>
 
                       <span className={text}>{categories.length}</span>
                     </div>
 
                     <div className={`flex justify-between text-sm ${muted}`}>
-                      <span>Total Charges</span>
+                      <span>Total Services</span>
 
                       <span className={text}>
                         {categories.reduce(
                           (sum, category) =>
                             sum +
-                            category.items.filter((item) =>
-                              item.description.trim(),
-                            ).length,
+                            category.items.filter((item) => item.service_id)
+                              .length,
 
                           0,
                         )}
@@ -1527,8 +1579,8 @@ export default function CreateIPBill() {
                     </div>
 
                     <p className={`text-xs ${muted}`}>
-                      The final amount is calculated from every charge in every
-                      category, after individual discounts.
+                      Rates are retrieved from backend pricing configuration for
+                      the selected room type.
                     </p>
                   </div>
                 </div>
@@ -1552,8 +1604,8 @@ export default function CreateIPBill() {
               >
                 <p className={`text-xs ${muted}`}>
                   {savedBill
-                    ? "Bill saved. Verify the saved bill details."
-                    : "Review all categories and charges before generating the bill."}
+                    ? "Bill saved successfully."
+                    : "Review the patient, room type, services, prices, and discounts before generating the bill."}
                 </p>
 
                 <div className="flex flex-wrap gap-3">
@@ -1567,7 +1619,9 @@ export default function CreateIPBill() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || Boolean(savedBill)}
+                    disabled={
+                      isSubmitting || Boolean(savedBill) || mastersLoading
+                    }
                     className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white hover:bg-[#323780] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? (

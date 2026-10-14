@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./Pages/Login";
@@ -29,6 +30,8 @@ import Users from "./Pages/Users";
 import CreateUser from "./Pages/CreateUser";
 import EditUser from "./Pages/EditUser";
 import UserDetails from "./Pages/UserDetails";
+
+import PricingManagement from "./Pages/PricingManagement";
 
 import ProtectedRoute from "./Components/Common/ProtectedRoute";
 import AccessDenied from "./Pages/AccessDenied";
@@ -170,6 +173,16 @@ export default function App() {
         element={
           <ProtectedRoute permission="payments.view">
             <ReceiptDetails />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pricing Management */}
+      <Route
+        path="/settings/pricing"
+        element={
+          <ProtectedRoute permission="pricing.view">
+            <PricingManagement />
           </ProtectedRoute>
         }
       />

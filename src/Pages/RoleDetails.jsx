@@ -13,12 +13,17 @@ import {
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
-const API_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "") + "/api/roles";
+const API_URL =
+  (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(
+    /\/+$/,
+    "",
+  ) + "/api/roles";
 
 const GROUPS = [
-  { title: "Dashboard", keys: ["dashboard.view"] },
+  {
+    title: "Dashboard",
+    keys: ["dashboard.view"],
+  },
   {
     title: "OP Patients",
     keys: ["patients.op.view", "patients.op.create", "patients.op.edit"],
@@ -27,9 +32,53 @@ const GROUPS = [
     title: "IP Patients",
     keys: ["patients.ip.view", "patients.ip.create", "patients.ip.edit"],
   },
-  { title: "OP Bills", keys: ["bills.op.view", "bills.op.create"] },
-  { title: "IP Bills", keys: ["bills.ip.view", "bills.ip.create"] },
-  { title: "Payments & Receipts", keys: ["payments.view", "payments.create"] },
+  {
+    title: "OP Bills",
+    keys: ["bills.op.view", "bills.op.create"],
+  },
+  {
+    title: "IP Bills",
+    keys: ["bills.ip.view", "bills.ip.create"],
+  },
+  {
+    title: "Payments & Receipts",
+    keys: ["payments.view", "payments.create"],
+  },
+  {
+    title: "Service Groups",
+    keys: [
+      "service_groups.view",
+      "service_groups.create",
+      "service_groups.edit",
+      "service_groups.delete",
+    ],
+  },
+  {
+    title: "Services",
+    keys: [
+      "services.view",
+      "services.create",
+      "services.edit",
+      "services.delete",
+    ],
+  },
+  {
+    title: "Pricing",
+    keys: ["pricing.view", "pricing.create", "pricing.edit", "pricing.delete"],
+  },
+  {
+    title: "Room Types",
+    keys: [
+      "room_types.view",
+      "room_types.create",
+      "room_types.edit",
+      "room_types.delete",
+    ],
+  },
+  {
+    title: "Doctors",
+    keys: ["doctors.view", "doctors.create", "doctors.edit", "doctors.delete"],
+  },
   {
     title: "Users",
     keys: ["users.view", "users.create", "users.edit", "users.delete"],
@@ -74,14 +123,11 @@ export default function RoleDetails() {
         }),
       ]);
 
-      const roleData = await readResponse(
-        roleResponse,
-        "Unable to load role."
-      );
+      const roleData = await readResponse(roleResponse, "Unable to load role.");
 
       const catalogData = await readResponse(
         catalogResponse,
-        "Unable to load permissions."
+        "Unable to load permissions.",
       );
 
       setRole(roleData);
@@ -98,14 +144,14 @@ export default function RoleDetails() {
   }, [loadRole]);
 
   const enabledCount = Object.values(role?.permissions ?? {}).filter(
-    Boolean
+    Boolean,
   ).length;
 
   return (
     <div className="min-h-screen bg-[#F6F6FC] dark:bg-slate-950">
       <AppSidebar />
 
-      <div className="min-h-screen md:ml-[248px]">
+      <div className="min-h-screen lg:ml-[260px]">
         <TopNavbar
           title="Role Details"
           breadcrumb={[
@@ -117,6 +163,7 @@ export default function RoleDetails() {
         />
 
         <main className="p-4 sm:p-6">
+          {/* Page Header */}
           <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <Link
@@ -135,6 +182,7 @@ export default function RoleDetails() {
                 <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
                   Role Details
                 </h1>
+
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Review role information and assigned permissions.
                 </p>
@@ -152,12 +200,16 @@ export default function RoleDetails() {
             )}
           </div>
 
+          {/* Error Message */}
           {error && (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
               <AlertCircle size={18} className="shrink-0" />
+
               <div className="flex-1">
                 <p>{error}</p>
+
                 <button
+                  type="button"
                   onClick={loadRole}
                   className="mt-1 inline-flex items-center gap-1 underline"
                 >
@@ -168,18 +220,21 @@ export default function RoleDetails() {
             </div>
           )}
 
+          {/* Loading State */}
           {loading ? (
             <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
               Loading role details...
             </div>
           ) : role ? (
             <div className="space-y-5">
+              {/* Role Information */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div className="mb-5 flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                       {role.name}
                     </h2>
+
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {role.description || "No description provided."}
                     </p>
@@ -201,6 +256,7 @@ export default function RoleDetails() {
                     <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Role ID
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {role.id}
                     </p>
@@ -210,6 +266,7 @@ export default function RoleDetails() {
                     <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Status
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {role.is_active ? "Active" : "Inactive"}
                     </p>
@@ -219,6 +276,7 @@ export default function RoleDetails() {
                     <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Enabled Permissions
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
                       {enabledCount}
                     </p>
@@ -229,6 +287,7 @@ export default function RoleDetails() {
                       <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         Created At
                       </p>
+
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
                         {new Date(role.created_at).toLocaleString()}
                       </p>
@@ -240,6 +299,7 @@ export default function RoleDetails() {
                       <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         Last Updated
                       </p>
+
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
                         {new Date(role.updated_at).toLocaleString()}
                       </p>
@@ -248,10 +308,12 @@ export default function RoleDetails() {
                 </div>
               </section>
 
+              {/* Permissions */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="font-semibold text-slate-900 dark:text-white">
                   Permissions
                 </h2>
+
                 <p className="mb-4 mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Enabled and disabled permissions for this role.
                 </p>
@@ -264,9 +326,7 @@ export default function RoleDetails() {
                   <div className="space-y-4">
                     {GROUPS.map((group) => {
                       const items = group.keys
-                        .map((key) =>
-                          catalog.find((item) => item.key === key)
-                        )
+                        .map((key) => catalog.find((item) => item.key === key))
                         .filter(Boolean);
 
                       if (!items.length) return null;
@@ -285,7 +345,7 @@ export default function RoleDetails() {
                           <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
                             {items.map((item) => {
                               const enabled = Boolean(
-                                role.permissions?.[item.key]
+                                role.permissions?.[item.key],
                               );
 
                               return (

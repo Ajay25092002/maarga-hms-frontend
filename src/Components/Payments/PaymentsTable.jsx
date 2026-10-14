@@ -62,8 +62,8 @@ export default function PaymentsTable({ payments = [], loading, error, page, pag
                     <td className="px-4 py-3"><ModeBadge value={payment.payment_method} dark={dark} /></td>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold">{formatCurrency(payment.amount)}</td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => onView(payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3E439C]/20 px-3 py-2 text-xs font-semibold text-[#3E439C] hover:bg-[#F1F0FF]">
-                        <Eye size={14} /> View
+                      <button type="button" onClick={() => onView(payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3E439C]/20 px-4 py-2 text-xs font-semibold text-[#3E439C] hover:bg-[#F1F0FF]">
+                         View
                       </button>
                     </td>
                   </tr>

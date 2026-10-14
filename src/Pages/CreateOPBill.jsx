@@ -20,12 +20,15 @@ import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
 import { useTheme } from "../Context/ThemeContext";
+
 import Loader from "../Components/Common/Loader";
+
 import FullPageLoader from "../Components/Common/FullPageLoader";
+
 import { useToast } from "../Components/Common/useToast";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001";
 
 const today = () => {
   const now = new Date();
@@ -37,12 +40,16 @@ const today = () => {
 
 const makeItem = () => ({
   id: `${Date.now()}-${Math.random()}`,
-
+  service_id: "",
   description: "",
+  priceLoading: false,
+  priceError: "",
 
   quantity: "1",
 
   rate: "",
+
+  discount_amount: "0",
 });
 
 const currency = (amount) =>
@@ -58,10 +65,55 @@ const currency = (amount) =>
 
 const patientName = (patient) => patient?.name?.trim() || "—";
 
+const unwrapList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+const recordId = (record) =>
+  record?.id ?? record?.service_id ?? record?.doctor_id ?? "";
+const recordName = (record) => record?.name ?? record?.service_name ?? "";
+const getResolvedPrice = (data) => {
+  const candidates = [
+    data?.amount,
+    data?.price,
+    data?.rate,
+    data?.resolved_price,
+    data?.service_price?.amount,
+    data?.data?.amount,
+    data?.data?.price,
+  ];
+  const value = candidates.find(
+    (candidate) =>
+      candidate !== undefined && candidate !== null && candidate !== "",
+  );
+  if (value === undefined || !Number.isFinite(Number(value)))
+    throw new Error("The pricing API did not return a valid service price.");
+  return Number(value);
+};
+
+const getItemAmounts = (item) => {
+  const quantity = Math.max(0, Number(item.quantity) || 0);
+
+  const rate = Math.max(0, Number(item.rate) || 0);
+
+  const amount = Math.round((quantity * rate + Number.EPSILON) * 100) / 100;
+
+  const discount = Math.max(0, Number(item.discount_amount) || 0);
+
+  const netAmount =
+    Math.round((Math.max(0, amount - discount) + Number.EPSILON) * 100) / 100;
+
+  return { amount, discount, netAmount };
+};
+
 export default function CreateOPBill() {
   const navigate = useNavigate();
 
   const { theme } = useTheme();
+
   const { showToast } = useToast();
 
   const dark = theme === "dark";
@@ -78,11 +130,23 @@ export default function CreateOPBill() {
 
   const [showPatientResults, setShowPatientResults] = useState(false);
 
+  const [doctors, setDoctors] = useState([]);
+  const [services, setServices] = useState([]);
+  const [mastersLoading, setMastersLoading] = useState(true);
+  const [mastersError, setMastersError] = useState("");
+
   const [billDate, setBillDate] = useState(today());
 
-  const [items, setItems] = useState([makeItem()]);
+  // Doctor and psychologist details
 
-  const [discount, setDiscount] = useState("0");
+  const [doctorId, setDoctorId] = useState("");
+  const [doctorName, setDoctorName] = useState("");
+
+  const [psychologistName, setPsychologistName] = useState("");
+
+  // Each service has its own quantity, rate and discount
+
+  const [items, setItems] = useState([makeItem()]);
 
   const [notes, setNotes] = useState("");
 
@@ -95,6 +159,7 @@ export default function CreateOPBill() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [savedBill, setSavedBill] = useState(null);
+  const [rateCategory] = useState("General OPD");
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -150,17 +215,25 @@ export default function CreateOPBill() {
         if (error.name === "AbortError") return;
 
         const message = error.message || "Unable to load patients.";
+
         setPatientsError(message);
+
         showToast({
           type: "error",
+
           title: "Unable to load patients",
+
           message,
+
           duration: 6000,
         });
       } finally {
-        if (!signal?.aborted) setPatientsLoading(false);
+        if (!signal?.aborted) {
+          setPatientsLoading(false);
+        }
       }
     },
+
     [showToast],
   );
 
@@ -171,6 +244,165 @@ export default function CreateOPBill() {
 
     return () => controller.abort();
   }, [loadPatients]);
+
+  const loadMasters = useCallback(async (signal) => {
+    setMastersLoading(true);
+    setMastersError("");
+    try {
+      const [doctorsResponse, servicesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/doctors`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          signal,
+        }),
+        fetch(`${API_BASE_URL}/api/services`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          signal,
+        }),
+      ]);
+      const [doctorsData, servicesData] = await Promise.all([
+        doctorsResponse.json().catch(() => null),
+        servicesResponse.json().catch(() => null),
+      ]);
+      if (!doctorsResponse.ok)
+        throw new Error(
+          doctorsData?.detail ||
+            `Unable to load doctors (${doctorsResponse.status}).`,
+        );
+      if (!servicesResponse.ok)
+        throw new Error(
+          servicesData?.detail ||
+            `Unable to load services (${servicesResponse.status}).`,
+        );
+      setDoctors(
+        unwrapList(doctorsData).filter((doctor) => doctor.is_active !== false),
+      );
+      setServices(
+        unwrapList(servicesData).filter(
+          (service) =>
+            service.is_active !== false && service.available_for_op !== false,
+        ),
+      );
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      setMastersError(
+        error.message || "Unable to load doctors and OP services.",
+      );
+    } finally {
+      if (!signal?.aborted) setMastersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadMasters(controller.signal);
+    return () => controller.abort();
+  }, [loadMasters]);
+
+  const resolveServicePrice = async (itemId, serviceId, selectedDoctorId) => {
+    if (!serviceId) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                service_id: "",
+                description: "",
+                rate: "",
+                priceLoading: false,
+                priceError: "",
+              }
+            : item,
+        ),
+      );
+      return;
+    }
+    if (!selectedDoctorId) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                service_id: serviceId,
+                rate: "",
+                priceLoading: false,
+                priceError: "Select a doctor before choosing a service.",
+              }
+            : item,
+        ),
+      );
+      return;
+    }
+    const service = services.find(
+      (entry) => String(recordId(entry)) === String(serviceId),
+    );
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              service_id: String(serviceId),
+              description: recordName(service),
+              rate: "",
+              priceLoading: true,
+              priceError: "",
+            }
+          : item,
+      ),
+    );
+    try {
+      const params = new URLSearchParams({
+        service_id: String(serviceId),
+        bill_type: "OP",
+        doctor_id: String(selectedDoctorId),
+      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/billing/service-price?${params.toString()}`,
+        { credentials: "include", headers: { Accept: "application/json" } },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = data?.detail;
+        throw new Error(
+          typeof detail === "string"
+            ? detail
+            : detail?.message ||
+                `No applicable OP price exists (${response.status}).`,
+        );
+      }
+      const amount = getResolvedPrice(data);
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                service_id: String(serviceId),
+                description: recordName(service),
+                rate: String(amount),
+                priceLoading: false,
+                priceError: "",
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                service_id: String(serviceId),
+                description: recordName(service),
+                rate: "",
+                priceLoading: false,
+                priceError: error.message || "Unable to resolve OP price.",
+              }
+            : item,
+        ),
+      );
+    }
+  };
 
   const filteredPatients = useMemo(() => {
     const query = patientQuery.trim().toLowerCase();
@@ -193,6 +425,7 @@ export default function CreateOPBill() {
         return searchable.some((value) =>
           String(value ?? "")
             .toLowerCase()
+
             .includes(query),
         );
       })
@@ -201,17 +434,30 @@ export default function CreateOPBill() {
   }, [patients, patientQuery]);
 
   const calculations = useMemo(() => {
-    const subtotal = items.reduce((sum, item) => {
-      const quantity = Math.max(0, Number(item.quantity) || 0);
-      const rate = Math.max(0, Number(item.rate) || 0);
-      return sum + quantity * rate;
-    }, 0);
+    let subtotal = 0;
 
-    const safeDiscount = Math.min(subtotal, Math.max(0, Number(discount) || 0));
-    const total = Math.max(0, subtotal - safeDiscount);
+    let discount = 0;
 
-    return { subtotal, discount: safeDiscount, total };
-  }, [items, discount]);
+    let total = 0;
+
+    for (const item of items) {
+      const amounts = getItemAmounts(item);
+
+      subtotal += amounts.amount;
+
+      discount += amounts.discount;
+
+      total += amounts.netAmount;
+    }
+
+    return {
+      subtotal: Math.round((subtotal + Number.EPSILON) * 100) / 100,
+
+      discount: Math.round((discount + Number.EPSILON) * 100) / 100,
+
+      total: Math.round((total + Number.EPSILON) * 100) / 100,
+    };
+  }, [items]);
 
   const updateItem = (id, field, value) => {
     setItems((current) =>
@@ -252,77 +498,152 @@ export default function CreateOPBill() {
   const validateForm = () => {
     if (!selectedPatient) {
       setNotice("Please select a registered patient.");
+
+      setNoticeType("error");
+
+      showToast({
+        type: "warning",
+
+        title: "Patient required",
+
+        message: "Please select a registered patient.",
+      });
+
+      return false;
+    }
+
+    if (!doctorId) {
+      setNotice("Please select a doctor before adding OP services.");
       setNoticeType("error");
       showToast({
         type: "warning",
-        title: "Patient required",
-        message: "Please select a registered patient.",
+        title: "Doctor required",
+        message: "Please select a doctor before adding OP services.",
       });
       return false;
     }
 
     if (!billDate) {
       setNotice("Please select a bill date.");
+
       setNoticeType("error");
+
       showToast({
         type: "warning",
+
         title: "Bill date required",
+
         message: "Please select a bill date.",
       });
+
       return false;
     }
 
-    const completedItems = items.filter((item) => item.description.trim());
+    const completedItems = items.filter(
+      (item) => item.service_id && item.description.trim(),
+    );
 
     if (completedItems.length === 0) {
       setNotice("Please add at least one service.");
+
       setNoticeType("error");
+
       showToast({
         type: "warning",
+
         title: "Service required",
+
         message: "Please add at least one service.",
       });
+
+      return false;
+    }
+
+    if (completedItems.some((item) => item.priceLoading)) {
+      setNotice("Wait for all OP service prices to finish loading.");
+      setNoticeType("error");
+      return false;
+    }
+    if (completedItems.some((item) => item.priceError || item.rate === "")) {
+      setNotice(
+        "A valid backend price is required for every selected service. Re-select the service to retry.",
+      );
+      setNoticeType("error");
       return false;
     }
 
     const hasInvalidItem = completedItems.some(
       (item) =>
-        Number(item.quantity) <= 0 ||
         item.quantity === "" ||
+        !Number.isFinite(Number(item.quantity)) ||
+        Number(item.quantity) <= 0 ||
         item.rate === "" ||
+        !Number.isFinite(Number(item.rate)) ||
         Number(item.rate) < 0,
     );
 
     if (hasInvalidItem) {
-      setNotice("Check every service description, quantity, and rate.");
+      setNotice("Check every service description, quantity and rate.");
+
       setNoticeType("error");
+
       showToast({
         type: "warning",
+
         title: "Check service details",
-        message: "Check every service description, quantity, and rate.",
+
+        message: "Enter a valid quantity and rate for every service.",
       });
+
       return false;
     }
 
-    if (Number(discount) < 0 || Number(discount) > calculations.subtotal) {
-      setNotice("Discount must be between zero and the subtotal.");
+    const hasInvalidDiscount = completedItems.some((item) => {
+      if (
+        item.discount_amount === "" ||
+        !Number.isFinite(Number(item.discount_amount))
+      ) {
+        return true;
+      }
+
+      const { amount } = getItemAmounts(item);
+
+      const discount = Number(item.discount_amount);
+
+      return discount < 0 || discount > amount;
+    });
+
+    if (hasInvalidDiscount) {
+      setNotice(
+        "Each line-item discount must be between zero and that item's gross amount.",
+      );
+
       setNoticeType("error");
+
       showToast({
         type: "warning",
-        title: "Invalid discount",
-        message: "Discount must be between zero and the subtotal.",
+
+        title: "Invalid line-item discount",
+
+        message: "Each discount must be between zero and its service amount.",
       });
+
       return false;
     }
 
     if (calculations.total <= 0) {
       setNotice("The bill total must be greater than zero.");
+
       setNoticeType("error");
+
       showToast({
         type: "warning",
+
         title: "Invalid bill total",
+
         message: "The bill total must be greater than zero.",
       });
+
       return false;
     }
 
@@ -333,37 +654,61 @@ export default function CreateOPBill() {
     event.preventDefault();
 
     if (isSubmitting || savedBill) return;
+
     if (!validateForm()) return;
 
-    const completedItems = items.filter((item) => item.description.trim());
+    const completedItems = items.filter(
+      (item) => item.service_id && item.description.trim(),
+    );
 
     const payload = {
       bill_type: "OP",
+
       patient_id: selectedPatient.patient_id,
-      // The backend schema expects a datetime, not only a date string.
+
       bill_date: `${billDate}T00:00:00`,
-      discount_amount: Number(discount || 0),
+      rate_category: rateCategory, // Added
+
+      // Doctor and psychologist information
+
+      doctor_name: doctorName.trim() || null,
+
+      psychologist_name: psychologistName.trim() || null,
+
+      // Discounts are applied per service row.
+
+      // The bill-level discount remains zero.
+
+      discount_amount: 0,
+
       notes: notes.trim() || null,
+
       items: completedItems.map((item) => ({
-        description: item.description.trim(),
-        quantity: Number(item.quantity),
-        rate: Number(item.rate),
-        discount_amount: 0,
-      })),
+      service_id: Number(item.service_id),
+      service_date: billDate,
+      quantity: Number(item.quantity),
+      discount_amount: Number(item.discount_amount || 0),
+    })),
     };
 
     setIsSubmitting(true);
+
     setNotice("");
+
     setNoticeType("error");
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/bills`, {
         method: "POST",
+
         credentials: "include",
+
         headers: {
           Accept: "application/json",
+
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify(payload),
       });
 
@@ -371,38 +716,55 @@ export default function CreateOPBill() {
 
       if (!response.ok) {
         const detail = data?.detail;
+
         const message = Array.isArray(detail)
           ? detail.map((item) => item.msg || "Invalid request").join("; ")
           : typeof detail === "string"
             ? detail
-            : "Unable to save the bill. Please check the details and try again.";
+            : detail?.message ||
+              "Unable to save the bill. Please check the details and try again.";
+
         throw new Error(message);
       }
 
       setSavedBill(data);
+
       setShowPreview(true);
+
       setNotice(
-        `Bill created successfully${data?.bill_number ? `: ${data.bill_number}` : ""}.`,
+        `Bill created successfully${
+          data?.bill_number ? `: ${data.bill_number}` : ""
+        }.`,
       );
+
       setNoticeType("success");
+
       showToast({
         type: "success",
+
         title: "OP bill created",
-        message: `Bill ${data?.bill_number ? `${data.bill_number} ` : ""}was saved successfully.`,
+
+        message: `Bill ${
+          data?.bill_number ? `${data.bill_number} ` : ""
+        }was saved successfully.`,
       });
     } catch (error) {
-      setNotice(
-        error.message ||
-          "Unable to connect to the billing server. Check the API URL and try again.",
-      );
+      const message =
+        error instanceof TypeError
+          ? "Unable to connect to the billing server. Check the API URL and try again."
+          : error.message || "Unable to save the bill. Please try again.";
+
+      setNotice(message);
+
       setNoticeType("error");
+
       showToast({
         type: "error",
+
         title: "Bill creation failed",
-        message:
-          error instanceof TypeError
-            ? "Unable to connect to the billing server. Check the API URL and try again."
-            : error.message || "Unable to save the bill. Please try again.",
+
+        message,
+
         duration: 6000,
       });
     } finally {
@@ -447,7 +809,7 @@ export default function CreateOPBill() {
                   </h1>
 
                   <p className={`mt-1 text-[13px] ${muted}`}>
-                    Enter patient and service details
+                    Enter patient, provider and service details
                   </p>
                 </div>
               </div>
@@ -464,19 +826,39 @@ export default function CreateOPBill() {
               </button>
             </div>
 
+            {mastersError && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <span>{mastersError}</span>
+                <button
+                  type="button"
+                  onClick={() => loadMasters()}
+                  className="font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {mastersLoading && (
+              <div className={`mb-4 text-sm ${muted}`}>
+                Loading doctors and OP services...
+              </div>
+            )}
+
             <form onSubmit={handleGenerateBill} className="space-y-7">
-              {/* Patient details */}
+              {/* Patient and provider details */}
 
               <section className={`border-b pb-6 ${border}`}>
                 <div className="mb-4 flex items-center gap-2">
                   <UserRound size={17} className="text-[#3E439C]" />
 
                   <h2 className={`text-sm font-semibold ${text}`}>
-                    Patient Details
+                    Patient & Provider Details
                   </h2>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {/* Patient search */}
+
                   <div className="relative">
                     <label className={labelClass}>Search Patient *</label>
 
@@ -514,9 +896,7 @@ export default function CreateOPBill() {
                         }`}
                       >
                         {patientsLoading ? (
-                          <div
-                            className={`flex items-center gap-2 p-3 text-sm ${muted}`}
-                          >
+                          <div className={`p-3 text-sm ${muted}`}>
                             <Loader
                               variant="button"
                               size="sm"
@@ -612,6 +992,88 @@ export default function CreateOPBill() {
                       />
                     </div>
                   </div>
+
+                  {/* Doctor name */}
+
+                  <div>
+                    <label htmlFor="doctorName" className={labelClass}>
+                      Doctor Name *
+                    </label>
+                    <select
+                      id="doctorName"
+                      value={doctorId}
+                      onChange={(event) => {
+                        const selectedId = event.target.value;
+                        const selectedDoctor = doctors.find(
+                          (doctor) => String(recordId(doctor)) === selectedId,
+                        );
+                        setDoctorId(selectedId);
+                        setDoctorName(recordName(selectedDoctor));
+                        setItems((current) =>
+                          current.map((item) => ({
+                            ...item,
+                            service_id: "",
+                            description: "",
+                            rate: "",
+                            priceLoading: false,
+                            priceError: "",
+                          })),
+                        );
+                      }}
+                      className={inputClass}
+                      required
+                      disabled={mastersLoading}
+                    >
+                      <option value="">
+                        {mastersLoading
+                          ? "Loading doctors..."
+                          : "Select doctor"}
+                      </option>
+                      {doctors.map((doctor) => (
+                        <option key={recordId(doctor)} value={recordId(doctor)}>
+                          {recordName(doctor)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Psychologist name */}
+
+                  <div>
+                    <label htmlFor="psychologistName" className={labelClass}>
+                      Psychologist Name
+                    </label>
+
+                    <input
+                      id="psychologistName"
+                      type="text"
+                      value={psychologistName}
+                      onChange={(event) =>
+                        setPsychologistName(event.target.value)
+                      }
+                      placeholder="Enter psychologist's name"
+                      maxLength={150}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {/* Rate Category */}
+                  <div>
+                    <label htmlFor="rateCategory" className={labelClass}>
+                      Rate Category
+                    </label>
+
+                    <input
+                      id="rateCategory"
+                      type="text"
+                      value={rateCategory}
+                      readOnly
+                      aria-readonly="true"
+                      className={`${inputClass} ${
+                        dark ? "bg-slate-800/70" : "bg-slate-50"
+                      }`}
+                    />
+                  </div>
                 </div>
               </section>
 
@@ -625,8 +1087,8 @@ export default function CreateOPBill() {
                     </h2>
 
                     <p className={`mt-1 text-xs ${muted}`}>
-                      Service rates are entered manually until the pricing
-                      catalogue is connected.
+                      Select a doctor, then choose an OP service. The applicable
+                      rate is loaded automatically.
                     </p>
                   </div>
 
@@ -641,7 +1103,7 @@ export default function CreateOPBill() {
                 </div>
 
                 <div className={`overflow-x-auto rounded-md border ${border}`}>
-                  <table className="w-full min-w-[700px] text-sm">
+                  <table className="w-full min-w-[1000px] text-sm">
                     <thead
                       className={
                         dark
@@ -651,19 +1113,27 @@ export default function CreateOPBill() {
                     >
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-semibold">
-                          Service Description
+                          OP Service
                         </th>
 
-                        <th className="w-28 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="w-24 px-3 py-3 text-right text-xs font-semibold">
                           Quantity
                         </th>
 
-                        <th className="w-36 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
                           Rate (₹)
                         </th>
 
-                        <th className="w-36 px-3 py-3 text-right text-xs font-semibold">
-                          Amount
+                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                          Gross Amount
+                        </th>
+
+                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                          Discount (₹)
+                        </th>
+
+                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                          Net Amount
                         </th>
 
                         <th className="w-12 px-2 py-3" />
@@ -672,27 +1142,53 @@ export default function CreateOPBill() {
 
                     <tbody>
                       {items.map((item) => {
-                        const amount =
-                          Math.max(0, Number(item.quantity) || 0) *
-                          Math.max(0, Number(item.rate) || 0);
+                        const { amount, netAmount } = getItemAmounts(item);
 
                         return (
                           <tr key={item.id} className={`border-t ${border}`}>
                             <td className="px-3 py-2.5">
-                              <input
-                                value={item.description}
+                              <select
+                                value={item.service_id || ""}
                                 onChange={(event) =>
-                                  updateItem(
+                                  resolveServicePrice(
                                     item.id,
-
-                                    "description",
-
                                     event.target.value,
+                                    doctorId,
                                   )
                                 }
-                                placeholder="e.g. Consultation Fee"
+                                disabled={
+                                  !doctorId ||
+                                  mastersLoading ||
+                                  item.priceLoading
+                                }
                                 className={inputClass}
-                              />
+                              >
+                                <option value="">
+                                  {!doctorId
+                                    ? "Select doctor first"
+                                    : mastersLoading
+                                      ? "Loading OP services..."
+                                      : "Select OP service"}
+                                </option>
+                                {services.map((service) => (
+                                  <option
+                                    key={recordId(service)}
+                                    value={recordId(service)}
+                                  >
+                                    {recordName(service)}
+                                  </option>
+                                ))}
+                              </select>
+                              {item.priceLoading && (
+                                <p className={`mt-1 text-xs ${muted}`}>
+                                  Loading applicable OP price...
+                                </p>
+                              )}
+                              {item.priceError && (
+                                <p className="mt-1 text-xs text-red-500">
+                                  {item.priceError}
+                                </p>
+                              )}
                             </td>
 
                             <td className="px-3 py-2.5">
@@ -720,24 +1216,47 @@ export default function CreateOPBill() {
                                 min="0"
                                 step="0.01"
                                 value={item.rate}
+                                readOnly
+                                aria-readonly="true"
+                                placeholder={
+                                  item.priceLoading ? "Loading..." : "—"
+                                }
+                                title="Rate is populated by the backend and cannot be edited."
+                                className={`${inputClass} text-right ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
+                              />
+                            </td>
+
+                            <td className={`px-3 py-2.5 text-right ${muted}`}>
+                              {currency(amount)}
+                            </td>
+
+                            <td className="px-3 py-2.5">
+                              <input
+                                type="number"
+                                min="0"
+                                max={amount}
+                                step="0.01"
+                                value={item.discount_amount}
                                 onChange={(event) =>
                                   updateItem(
                                     item.id,
 
-                                    "rate",
+                                    "discount_amount",
 
                                     event.target.value,
                                   )
                                 }
-                                placeholder="0.00"
                                 className={`${inputClass} text-right`}
+                                aria-label={`Discount for ${
+                                  item.description || "service"
+                                }`}
                               />
                             </td>
 
                             <td
-                              className={`px-3 py-2.5 text-right font-medium ${text}`}
+                              className={`px-3 py-2.5 text-right font-semibold ${text}`}
                             >
-                              {currency(amount)}
+                              {currency(netAmount)}
                             </td>
 
                             <td className="px-2 py-2.5 text-center">
@@ -758,18 +1277,22 @@ export default function CreateOPBill() {
                 </div>
               </section>
 
-              {/* Bill summary and notes */}
+              {/* Notes and summary */}
+
               <section className="grid grid-cols-1 gap-7 lg:grid-cols-2">
                 <div>
                   <div className="mb-4 flex items-center gap-2">
                     <ReceiptText size={17} className="text-[#3E439C]" />
+
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Bill Notes
                     </h2>
                   </div>
+
                   <label htmlFor="notes" className={labelClass}>
                     Notes (optional)
                   </label>
+
                   <textarea
                     id="notes"
                     rows={3}
@@ -790,45 +1313,44 @@ export default function CreateOPBill() {
                   <h2 className={`mb-4 text-sm font-semibold ${text}`}>
                     Bill Summary
                   </h2>
+
                   <div className="space-y-4">
                     <div className={`flex justify-between text-sm ${muted}`}>
                       <span>Subtotal</span>
+
                       <span className={text}>
                         {currency(calculations.subtotal)}
                       </span>
                     </div>
-                    <div
-                      className={`flex items-center justify-between gap-4 text-sm ${muted}`}
-                    >
-                      <label htmlFor="discount">Discount (₹)</label>
-                      <input
-                        id="discount"
-                        type="number"
-                        min="0"
-                        max={calculations.subtotal}
-                        step="0.01"
-                        value={discount}
-                        onChange={(event) => setDiscount(event.target.value)}
-                        className={`${inputClass} max-w-36 text-right`}
-                      />
+
+                    <div className={`flex justify-between text-sm ${muted}`}>
+                      <span>Total Line-item Discounts</span>
+
+                      <span className={text}>
+                        {currency(calculations.discount)}
+                      </span>
                     </div>
+
                     <div
                       className={`flex justify-between border-t pt-4 ${border}`}
                     >
                       <span className={`text-sm font-semibold ${text}`}>
                         Total Bill Amount
                       </span>
+
                       <span className="text-xl font-bold text-[#3E439C] dark:text-[#B9B7FF]">
                         {currency(calculations.total)}
                       </span>
                     </div>
+
                     <p className={`text-xs ${muted}`}>
-                      Payment will be recorded separately after the bill is
-                      created.
+                      Payment is recorded separately after the bill is created.
                     </p>
                   </div>
                 </div>
               </section>
+
+              {/* Submission status */}
 
               {notice && (
                 <div
@@ -848,8 +1370,8 @@ export default function CreateOPBill() {
               >
                 <p className={`text-xs ${muted}`}>
                   {savedBill
-                    ? "Bill saved to the database. Payment will be recorded separately."
-                    : "Bill details will be saved to the billing database when you generate the bill."}
+                    ? "Bill saved to the database."
+                    : "Bill details will be saved when you generate the bill."}
                 </p>
 
                 <div className="flex flex-wrap gap-3">
@@ -863,7 +1385,9 @@ export default function CreateOPBill() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || Boolean(savedBill)}
+                    disabled={
+                      isSubmitting || Boolean(savedBill) || mastersLoading
+                    }
                     className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white hover:bg-[#323780] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? (
@@ -871,11 +1395,11 @@ export default function CreateOPBill() {
                         variant="button"
                         size="sm"
                         message="Saving bill..."
-                        className="text-white [&_span:first-child]:border-white/30 [&_span:first-child]:border-t-white"
                       />
                     ) : (
                       <>
                         <CheckCircle2 size={16} />
+
                         {savedBill ? "Bill Saved" : "Generate Bill"}
                       </>
                     )}
@@ -884,27 +1408,29 @@ export default function CreateOPBill() {
               </div>
             </form>
 
-            {/* Draft preview */}
+            {/* Saved bill preview */}
 
             {showPreview && (
               <section className={`mt-8 border-t pt-6 ${border}`}>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className={`text-base font-semibold ${text}`}>
-                    {savedBill ? "Saved OP Bill" : "Draft Bill Preview"}
+                    Saved OP Bill
                   </h2>
 
                   <button
                     type="button"
                     onClick={() => setShowPreview(false)}
                     className={`rounded-md border p-2 ${border} ${muted}`}
-                    aria-label="Close draft preview"
+                    aria-label="Close bill preview"
                   >
                     <X size={16} />
                   </button>
                 </div>
 
                 <div
-                  className={`border p-5 sm:p-7 ${border} ${dark ? "bg-[#171827]" : "bg-white"}`}
+                  className={`border p-5 sm:p-7 ${border} ${
+                    dark ? "bg-[#171827]" : "bg-white"
+                  }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
                     <div>
@@ -912,20 +1438,12 @@ export default function CreateOPBill() {
                         MAARGA MINDCARE
                       </h3>
 
-                      <p className={`mt-1 text-xs ${muted}`}>
-                        OUTPATIENT BILL{savedBill ? "" : " — DRAFT"}
-                      </p>
+                      <p className={`mt-1 text-xs ${muted}`}>OUTPATIENT BILL</p>
                     </div>
 
-                    {savedBill ? (
-                      <span className="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
-                        SAVED
-                      </span>
-                    ) : (
-                      <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                        DRAFT — NOT SAVED
-                      </span>
-                    )}
+                    <span className="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
+                      SAVED
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 py-5 sm:grid-cols-2">
@@ -952,17 +1470,32 @@ export default function CreateOPBill() {
                         {billDate}
                       </p>
 
+                      <p className={`mt-3 text-xs ${muted}`}>Doctor Name</p>
+
+                      <p className={`mt-1 text-sm font-medium ${text}`}>
+                        {savedBill?.doctor_name || doctorName || "—"}
+                      </p>
+
+                      <p className={`mt-3 text-xs ${muted}`}>
+                        Psychologist Name
+                      </p>
+
+                      <p className={`mt-1 text-sm font-medium ${text}`}>
+                        {savedBill?.psychologist_name ||
+                          psychologistName ||
+                          "—"}
+                      </p>
+
                       <p className={`mt-3 text-xs ${muted}`}>Bill Number</p>
 
                       <p className={`mt-1 text-sm font-medium ${text}`}>
-                        {savedBill?.bill_number ||
-                          "Assigned when the bill is saved"}
+                        {savedBill?.bill_number || "—"}
                       </p>
                     </div>
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[480px] text-sm">
+                    <table className="w-full min-w-[700px] text-sm">
                       <thead className={dark ? "bg-slate-800" : "bg-slate-50"}>
                         <tr>
                           <th className="px-3 py-2 text-left text-xs">
@@ -974,7 +1507,15 @@ export default function CreateOPBill() {
                           <th className="px-3 py-2 text-right text-xs">Rate</th>
 
                           <th className="px-3 py-2 text-right text-xs">
-                            Amount
+                            Gross
+                          </th>
+
+                          <th className="px-3 py-2 text-right text-xs">
+                            Discount
+                          </th>
+
+                          <th className="px-3 py-2 text-right text-xs">
+                            Net Amount
                           </th>
                         </tr>
                       </thead>
@@ -984,27 +1525,43 @@ export default function CreateOPBill() {
 
                           .filter((item) => item.description.trim())
 
-                          .map((item) => (
-                            <tr key={item.id} className={`border-t ${border}`}>
-                              <td className={`px-3 py-3 ${text}`}>
-                                {item.description}
-                              </td>
+                          .map((item) => {
+                            const { amount, discount, netAmount } =
+                              getItemAmounts(item);
 
-                              <td className={`px-3 py-3 text-right ${text}`}>
-                                {item.quantity}
-                              </td>
+                            return (
+                              <tr
+                                key={item.id}
+                                className={`border-t ${border}`}
+                              >
+                                <td className={`px-3 py-3 ${text}`}>
+                                  {item.description}
+                                </td>
 
-                              <td className={`px-3 py-3 text-right ${text}`}>
-                                {currency(item.rate)}
-                              </td>
+                                <td className={`px-3 py-3 text-right ${text}`}>
+                                  {item.quantity}
+                                </td>
 
-                              <td className={`px-3 py-3 text-right ${text}`}>
-                                {currency(
-                                  Number(item.quantity) * Number(item.rate),
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                                <td className={`px-3 py-3 text-right ${text}`}>
+                                  {currency(item.rate)}
+                                </td>
+
+                                <td className={`px-3 py-3 text-right ${text}`}>
+                                  {currency(amount)}
+                                </td>
+
+                                <td className={`px-3 py-3 text-right ${text}`}>
+                                  {currency(discount)}
+                                </td>
+
+                                <td
+                                  className={`px-3 py-3 text-right font-semibold ${text}`}
+                                >
+                                  {currency(netAmount)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -1021,7 +1578,7 @@ export default function CreateOPBill() {
                     </div>
 
                     <div className={`flex justify-between text-sm ${muted}`}>
-                      <span>Discount</span>
+                      <span>Total Line-item Discounts</span>
 
                       <span className={text}>
                         {currency(calculations.discount)}

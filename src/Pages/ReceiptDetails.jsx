@@ -146,46 +146,7 @@ const handlePrintReceipt = async () => {
         />
 
         <main className="min-w-0 space-y-5 px-4 py-5 sm:px-5 lg:px-6">
-          {/* Page heading */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F1F0FF] text-[#3E439C]">
-                <ReceiptIconFallback />
-              </div>
-
-              <div className="min-w-0">
-                <h1
-                  className={`text-xl font-bold ${
-                    dark ? "text-slate-100" : "text-slate-900"
-                  }`}
-                >
-                  Receipt Details
-                </h1>
-
-                <p
-                  className={`mt-1 text-sm ${
-                    dark ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  Review and print a recorded payment receipt.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate("/payments")}
-              className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
-                dark
-                  ? "border-slate-700 text-slate-200 hover:bg-slate-800"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <ArrowLeft size={16} />
-              Back to payments
-            </button>
-          </div>
-
+         
           {/* Loading state */}
           {loading && (
             <div

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
-
+import { useTheme } from "../Context/ThemeContext";
 import {
   ResponsiveContainer,
   LineChart,
@@ -23,64 +23,42 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 const PRIMARY = "#3E439C";
-
 const STATUS_COLORS = ["#16A34A", "#F59E0B", "#DC2626"];
 
 const EMPTY_DATA = {
   summary: {
     patients_registered_today: 0,
-
     op_bills_today: 0,
-
     ip_bills_today: 0,
-
     collection_today: 0,
-
     outstanding_amount: 0,
   },
-
   charts: {
     collection_trend: [],
-
     billing_trend: [],
-
     payment_status: {
       paid: 0,
-
       partially_paid: 0,
-
       unpaid: 0,
     },
   },
-
   recent_bills: [],
-
   generated_at: null,
 };
 
 const currency = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
-
     currency: "INR",
-
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
 
 const compactCurrency = (value) => {
   const amount = Number(value) || 0;
 
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(1)}Cr`;
-  }
-
-  if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(1)}L`;
-  }
-
-  if (amount >= 1000) {
-    return `₹${(amount / 1000).toFixed(1)}K`;
-  }
+  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
 
   return `₹${amount}`;
 };
@@ -89,14 +67,11 @@ const formatDate = (value) => {
   if (!value) return "—";
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
-
     month: "short",
-
     year: "numeric",
   });
 };
@@ -104,35 +79,46 @@ const formatDate = (value) => {
 const shortDate = (value) => {
   if (!value) return "";
 
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
-
     month: "short",
   });
 };
 
-function MetricCard({ title, value, subtitle, icon, accent }) {
+function MetricCard({ title, value, subtitle, icon, accent, dark }) {
   return (
-    <div className="rounded-xl border border-[#E9E9F4] bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div
+      className={`rounded-xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
+        dark ? "border-slate-700 bg-[#191A2A]" : "border-[#E9E9F4] bg-white"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p
+            className={`text-sm font-medium ${dark ? "text-slate-400" : "text-gray-500"}`}
+          >
+            {title}
+          </p>
 
-          <p className="mt-2 break-words text-xl font-semibold tracking-tight text-[#20213A] sm:text-2xl">
+          <p
+            className={`mt-2 break-words text-xl font-semibold tracking-tight sm:text-2xl ${
+              dark ? "text-slate-100" : "text-[#20213A]"
+            }`}
+          >
             {value}
           </p>
 
-          {subtitle && <p className="mt-2 text-xs text-gray-500">{subtitle}</p>}
+
         </div>
 
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg"
           style={{
-            backgroundColor: `${accent}15`,
-
-            color: accent,
+            backgroundColor: dark ? `${accent}28` : `${accent}15`,
+            color: dark && accent === PRIMARY ? "#B9B7FF" : accent,
           }}
         >
           {icon}
@@ -142,15 +128,27 @@ function MetricCard({ title, value, subtitle, icon, accent }) {
   );
 }
 
-function Panel({ title, subtitle, children, className = "" }) {
+function Panel({ title, subtitle, children, className = "", dark }) {
   return (
     <section
-      className={`min-w-0 rounded-xl border border-[#E9E9F4] bg-white p-4 shadow-sm ${className}`}
+      className={`min-w-0 rounded-xl border p-4 shadow-sm ${
+        dark ? "border-slate-700 bg-[#191A2A]" : "border-[#E9E9F4] bg-white"
+      } ${className}`}
     >
       <div className="mb-4">
-        <h2 className="text-sm font-semibold text-[#20213A]">{title}</h2>
+        <h2
+          className={`text-sm font-semibold ${dark ? "text-slate-100" : "text-[#20213A]"}`}
+        >
+          {title}
+        </h2>
 
-        {subtitle && <p className="mt-1 text-xs text-gray-500">{subtitle}</p>}
+        {subtitle && (
+          <p
+            className={`mt-1 text-xs ${dark ? "text-slate-400" : "text-gray-500"}`}
+          >
+            {subtitle}
+          </p>
+        )}
       </div>
 
       {children}
@@ -158,12 +156,22 @@ function Panel({ title, subtitle, children, className = "" }) {
   );
 }
 
-function ChartTooltip({ active, payload, label, money = false }) {
+function ChartTooltip({ active, payload, label, money = false, dark }) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg">
-      <p className="mb-2 text-xs font-medium text-gray-500">{label}</p>
+    <div
+      className={`rounded-xl border px-4 py-3 shadow-lg ${
+        dark
+          ? "border-slate-600 bg-[#202235] text-slate-100"
+          : "border-gray-200 bg-white text-gray-900"
+      }`}
+    >
+      <p
+        className={`mb-2 text-xs font-medium ${dark ? "text-slate-400" : "text-gray-500"}`}
+      >
+        {label}
+      </p>
 
       {payload.map((item) => (
         <div
@@ -174,10 +182,10 @@ function ChartTooltip({ active, payload, label, money = false }) {
             className="h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: item.color }}
           />
-
-          <span className="text-gray-600">{item.name}:</span>
-
-          <span className="font-semibold text-gray-900">
+          <span className={dark ? "text-slate-300" : "text-gray-600"}>
+            {item.name}:
+          </span>
+          <span className="font-semibold">
             {money
               ? currency(item.value)
               : Number(item.value).toLocaleString("en-IN")}
@@ -190,17 +198,18 @@ function ChartTooltip({ active, payload, label, money = false }) {
 
 function StatusBadge({ status }) {
   const styles = {
-    Paid: "bg-green-50 text-green-700 ring-green-200",
-
-    "Partially Paid": "bg-amber-50 text-amber-700 ring-amber-200",
-
-    Unpaid: "bg-red-50 text-red-700 ring-red-200",
+    Paid: "bg-green-100 text-green-800 ring-green-300 dark:bg-green-950/50 dark:text-green-300 dark:ring-green-800",
+    "Partially Paid":
+      "bg-amber-100 text-amber-800 ring-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800",
+    Unpaid:
+      "bg-red-100 text-red-800 ring-red-300 dark:bg-red-950/50 dark:text-red-300 dark:ring-red-800",
   };
 
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
-        styles[status] || "bg-gray-50 text-gray-600 ring-gray-200"
+        styles[status] ||
+        "bg-gray-100 text-gray-700 ring-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600"
       }`}
     >
       {status || "Unknown"}
@@ -208,13 +217,25 @@ function StatusBadge({ status }) {
   );
 }
 
+function EmptyChart({ message, dark }) {
+  return (
+    <div
+      className={`flex h-full min-h-[180px] items-center justify-center text-sm ${
+        dark ? "text-slate-400" : "text-gray-400"
+      }`}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const { theme } = useTheme();
+  const dark = theme === "dark";
+
   const [dashboard, setDashboard] = useState(EMPTY_DATA);
-
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const [error, setError] = useState("");
 
   const fetchDashboard = useCallback(async (isRefresh = false) => {
@@ -229,12 +250,8 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/dashboard`, {
         method: "GET",
-
         credentials: "include",
-
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
 
       if (!response.ok) {
@@ -254,26 +271,19 @@ export default function Dashboard() {
       setDashboard({
         summary: {
           ...EMPTY_DATA.summary,
-
           ...result.summary,
         },
-
         charts: {
           ...EMPTY_DATA.charts,
-
           ...result.charts,
-
           payment_status: {
             ...EMPTY_DATA.charts.payment_status,
-
             ...result.charts?.payment_status,
           },
         },
-
         recent_bills: Array.isArray(result.recent_bills)
           ? result.recent_bills
           : [],
-
         generated_at: result.generated_at || null,
       });
     } catch (err) {
@@ -282,7 +292,6 @@ export default function Dashboard() {
       );
     } finally {
       setLoading(false);
-
       setRefreshing(false);
     }
   }, []);
@@ -292,78 +301,98 @@ export default function Dashboard() {
   }, [fetchDashboard]);
 
   const summary = dashboard.summary;
-
   const charts = dashboard.charts;
 
   const paymentStatusData = [
-    {
-      name: "Paid",
-
-      value: Number(charts.payment_status.paid) || 0,
-    },
-
+    { name: "Paid", value: Number(charts.payment_status.paid) || 0 },
     {
       name: "Partially Paid",
-
       value: Number(charts.payment_status.partially_paid) || 0,
     },
-
-    {
-      name: "Unpaid",
-
-      value: Number(charts.payment_status.unpaid) || 0,
-    },
+    { name: "Unpaid", value: Number(charts.payment_status.unpaid) || 0 },
   ];
 
   const totalBills = paymentStatusData.reduce(
     (total, item) => total + item.value,
-
     0,
   );
 
-  const chartAxisStyle = {
+  const axisStyle = {
     fontSize: 11,
-
-    fill: "#73738A",
+    fill: dark ? "#A7AEC0" : "#73738A",
   };
 
+  const gridColor = dark ? "#34364B" : "#EEEEF5";
+  const axisLineColor = dark ? "#45475C" : "#DCDCE8";
+
+  const pageText = dark ? "text-slate-100" : "text-[#20213A]";
+  const mutedText = dark ? "text-slate-400" : "text-gray-500";
+  const tableBorder = dark ? "border-slate-700" : "border-gray-100";
+  const tableHeader = dark
+    ? "bg-[#202235] text-slate-300"
+    : "bg-[#FAFAFD] text-gray-500";
+  const tableHover = dark ? "hover:bg-[#222438]" : "hover:bg-[#FAFAFD]";
+
   return (
-    <div className="min-h-screen min-w-0 bg-[#F6F6FC]">
+    <div
+      className={`min-h-screen min-w-0 transition-colors ${
+        dark ? "bg-[#11121F] text-slate-100" : "bg-[#F6F6FC] text-[#20213A]"
+      }`}
+    >
       <AppSidebar />
+
       <div className="min-h-screen min-w-0 md:ml-[72px] lg:ml-[260px]">
         <TopNavbar
           title="Hospital Operations"
           breadcrumb={["Hospital Management", "Dashboard"]}
         />
+
         <main className="min-w-0 px-3 py-3 sm:px-5 lg:px-6">
           <div className="mx-auto w-full max-w-[1500px] space-y-4">
-            {/* Page header */}
-
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <p className="text-sm font-medium text-[#3E439C]">Overview</p>
+                <p className="text-sm font-medium text-[#3E439C] dark:text-[#B9B7FF]">
+                  Overview
+                </p>
 
-                <h1 className="mt-1 text-xl font-semibold tracking-tight text-[#20213A] sm:text-2xl">
+                <h1
+                  className={`mt-1 text-xl font-semibold tracking-tight sm:text-2xl ${pageText}`}
+                >
                   Dashboard
                 </h1>
 
-                <p className="mt-1 text-xs text-gray-500">
+                <p className={`mt-1 text-xs ${mutedText}`}>
                   Overview of hospital registrations, billing and collections.
                 </p>
               </div>
 
-     
+              <button
+                type="button"
+                onClick={() => fetchDashboard(true)}
+                disabled={loading || refreshing}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#3E439C] px-3 text-sm font-medium text-white transition hover:bg-[#323780] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span
+                  className={
+                    refreshing
+                      ? "inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                      : ""
+                  }
+                />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
             </div>
-
-            {/* Error message */}
 
             {error && (
               <div
                 role="alert"
-                className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between"
+                className={`flex flex-col gap-3 rounded-xl border p-4 text-sm sm:flex-row sm:items-center sm:justify-between ${
+                  dark
+                    ? "border-red-900 bg-red-950/30 text-red-300"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
               >
                 <p>{error}</p>
-
                 <button
                   type="button"
                   onClick={() => fetchDashboard()}
@@ -374,139 +403,125 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Loading */}
-
             {loading ? (
-              <div className="grid min-h-64 place-items-center rounded-xl border border-[#E9E9F4] bg-white">
+              <div
+                className={`grid min-h-64 place-items-center rounded-xl border ${
+                  dark
+                    ? "border-slate-700 bg-[#191A2A]"
+                    : "border-[#E9E9F4] bg-white"
+                }`}
+              >
                 <div className="text-center">
                   <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#E4E4F7] border-t-[#3E439C]" />
-
-                  <p className="mt-4 text-sm text-gray-500">
+                  <p className={`mt-4 text-sm ${mutedText}`}>
                     Loading dashboard...
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                {/* Summary cards */}
-
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                   <MetricCard
-                    title="Patients Registered Today"
+                    title="New Patients Today"
                     value={Number(
-                      summary.patients_registered_today,
+                      summary.patients_registered_today || 0,
                     ).toLocaleString("en-IN")}
-                    subtitle="New patient registrations"
                     icon="♙"
                     accent="#3E439C"
+                    dark={dark}
                   />
-
                   <MetricCard
                     title="OP Bills Today"
-                    value={Number(summary.op_bills_today).toLocaleString(
+                    value={Number(summary.op_bills_today || 0).toLocaleString(
                       "en-IN",
                     )}
-                    subtitle="Outpatient bills"
                     icon="▤"
                     accent="#0891B2"
+                    dark={dark}
                   />
-
                   <MetricCard
                     title="IP Bills Today"
-                    value={Number(summary.ip_bills_today).toLocaleString(
+                    value={Number(summary.ip_bills_today || 0).toLocaleString(
                       "en-IN",
                     )}
-                    subtitle="Inpatient bills"
                     icon="▣"
                     accent="#7C3AED"
+                    dark={dark}
                   />
-
                   <MetricCard
-                    title="Collection Today"
+                    title="Collections Today"
                     value={currency(summary.collection_today)}
-                    subtitle="Payments received today"
                     icon="₹"
                     accent="#16A34A"
+                    dark={dark}
                   />
-
                   <MetricCard
-                    title="Outstanding Amount"
+                    title="Outstanding Balance"
                     value={currency(summary.outstanding_amount)}
-                    subtitle="Balance due across bills"
                     icon="◷"
                     accent="#EA580C"
+                    dark={dark}
                   />
                 </div>
-
-                {/* Collection trend and payment status */}
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                   <Panel
                     title="Collection Trend"
                     subtitle="Payments received over the last 7 days"
                     className="xl:col-span-2"
+                    dark={dark}
                   >
                     <div className="h-[230px] w-full">
                       {charts.collection_trend.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart
                             data={charts.collection_trend}
-                            margin={{
-                              top: 8,
-
-                              right: 12,
-
-                              left: 0,
-
-                              bottom: 4,
-                            }}
+                            margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
                           >
                             <CartesianGrid
-                              stroke="#EEEEF5"
+                              stroke={gridColor}
                               strokeDasharray="4 4"
                               vertical={false}
                             />
-
                             <XAxis
                               dataKey="date"
                               tickFormatter={shortDate}
-                              tick={chartAxisStyle}
-                              axisLine={false}
+                              tick={axisStyle}
+                              axisLine={{ stroke: axisLineColor }}
                               tickLine={false}
                               tickMargin={10}
                             />
-
                             <YAxis
                               tickFormatter={compactCurrency}
-                              tick={chartAxisStyle}
+                              tick={axisStyle}
                               axisLine={false}
                               tickLine={false}
                               width={58}
                             />
-
-                            <Tooltip content={<ChartTooltip money />} />
-
+                            <Tooltip
+                              content={<ChartTooltip money dark={dark} />}
+                            />
                             <Line
                               type="monotone"
                               dataKey="amount"
                               name="Collection"
-                              stroke={PRIMARY}
+                              stroke={dark ? "#A5A8FF" : PRIMARY}
                               strokeWidth={3}
                               dot={{
                                 r: 4,
-
-                                fill: PRIMARY,
-
+                                fill: dark ? "#A5A8FF" : PRIMARY,
                                 strokeWidth: 2,
-
-                                stroke: "#FFFFFF",
+                                stroke: dark ? "#191A2A" : "#FFFFFF",
                               }}
                               activeDot={{ r: 6 }}
                             />
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
-                        <EmptyChart message="No collection data available." />
+                        <EmptyChart
+                          message="No collection data available."
+                          dark={dark}
+                        />
                       )}
                     </div>
                   </Panel>
@@ -514,6 +529,7 @@ export default function Dashboard() {
                   <Panel
                     title="Payment Status"
                     subtitle="Bill payment breakdown"
+                    dark={dark}
                   >
                     {totalBills > 0 ? (
                       <>
@@ -538,11 +554,18 @@ export default function Dashboard() {
                                   />
                                 ))}
                               </Pie>
-
                               <Tooltip
+                                contentStyle={{
+                                  backgroundColor: dark ? "#202235" : "#FFFFFF",
+                                  borderColor: dark ? "#45475C" : "#E5E7EB",
+                                  borderRadius: 12,
+                                  color: dark ? "#F1F5F9" : "#111827",
+                                }}
+                                itemStyle={{
+                                  color: dark ? "#F1F5F9" : "#111827",
+                                }}
                                 formatter={(value, name) => [
                                   Number(value).toLocaleString("en-IN"),
-
                                   name,
                                 ]}
                               />
@@ -550,11 +573,12 @@ export default function Dashboard() {
                           </ResponsiveContainer>
 
                           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-2xl font-semibold text-[#20213A]">
+                            <span
+                              className={`text-2xl font-semibold ${pageText}`}
+                            >
                               {totalBills}
                             </span>
-
-                            <span className="mt-1 text-xs text-gray-500">
+                            <span className={`mt-1 text-xs ${mutedText}`}>
                               Total bills
                             </span>
                           </div>
@@ -573,16 +597,20 @@ export default function Dashboard() {
                                     backgroundColor: STATUS_COLORS[index],
                                   }}
                                 />
-
-                                <span className="text-sm text-gray-600">
+                                <span
+                                  className={`text-sm ${dark ? "text-slate-300" : "text-gray-600"}`}
+                                >
                                   {item.name}
                                 </span>
                               </div>
 
-                              <span className="text-sm font-semibold text-[#20213A]">
+                              <span
+                                className={`text-sm font-semibold ${pageText}`}
+                              >
                                 {item.value}
-
-                                <span className="ml-2 font-normal text-gray-400">
+                                <span
+                                  className={`ml-2 font-normal ${dark ? "text-slate-500" : "text-gray-400"}`}
+                                >
                                   {((item.value / totalBills) * 100).toFixed(1)}
                                   %
                                 </span>
@@ -592,76 +620,66 @@ export default function Dashboard() {
                         </div>
                       </>
                     ) : (
-                      <EmptyChart message="No payment status data available." />
+                      <EmptyChart
+                        message="No payment status data available."
+                        dark={dark}
+                      />
                     )}
                   </Panel>
                 </div>
 
-                {/* OP/IP billing trend */}
-
                 <Panel
                   title="OP vs IP Billing"
                   subtitle="Daily billed amounts over the last 7 days"
+                  dark={dark}
                 >
                   <div className="h-[260px] w-full">
                     {charts.billing_trend.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={charts.billing_trend}
-                          margin={{
-                            top: 8,
-
-                            right: 8,
-
-                            left: 0,
-
-                            bottom: 4,
-                          }}
+                          margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
                           barGap={5}
                         >
                           <CartesianGrid
-                            stroke="#EEEEF5"
+                            stroke={gridColor}
                             strokeDasharray="4 4"
                             vertical={false}
                           />
-
                           <XAxis
                             dataKey="date"
                             tickFormatter={shortDate}
-                            tick={chartAxisStyle}
-                            axisLine={false}
+                            tick={axisStyle}
+                            axisLine={{ stroke: axisLineColor }}
                             tickLine={false}
                             tickMargin={10}
                           />
-
                           <YAxis
                             tickFormatter={compactCurrency}
-                            tick={chartAxisStyle}
+                            tick={axisStyle}
                             axisLine={false}
                             tickLine={false}
                             width={58}
                           />
-
-                          <Tooltip content={<ChartTooltip money />} />
-
+                          <Tooltip
+                            content={<ChartTooltip money dark={dark} />}
+                          />
                           <Legend
                             verticalAlign="top"
                             align="right"
                             wrapperStyle={{
                               fontSize: 12,
-
                               paddingBottom: 18,
+                              color: dark ? "#CBD5E1" : "#4B5563",
                             }}
                           />
-
                           <Bar
                             dataKey="op_bill_amount"
                             name="OP Billing"
-                            fill="#3E439C"
+                            fill={dark ? "#A5A8FF" : "#3E439C"}
                             radius={[5, 5, 0, 0]}
                             maxBarSize={32}
                           />
-
                           <Bar
                             dataKey="ip_bill_amount"
                             name="IP Billing"
@@ -672,71 +690,68 @@ export default function Dashboard() {
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <EmptyChart message="No billing trend data available." />
+                      <EmptyChart
+                        message="No billing trend data available."
+                        dark={dark}
+                      />
                     )}
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2">
-                    <div className="rounded-xl bg-[#F6F6FC] p-4">
-                      <p className="text-sm text-gray-500">Today's OP bills</p>
-
-                      <p className="mt-1 text-lg font-semibold text-[#3E439C]">
+                  <div
+                    className={`mt-4 grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2 ${dark ? "border-slate-700" : "border-gray-100"}`}
+                  >
+                    <div
+                      className={`rounded-xl p-4 ${dark ? "bg-[#222438]" : "bg-[#F6F6FC]"}`}
+                    >
+                      <p className={`text-sm ${mutedText}`}>Today's OP bills</p>
+                      <p className="mt-1 text-lg font-semibold text-[#3E439C] dark:text-[#B9B7FF]">
                         {summary.op_bills_today}
                       </p>
                     </div>
-
-                    <div className="rounded-xl bg-[#F6F6FC] p-4">
-                      <p className="text-sm text-gray-500">Today's IP bills</p>
-
-                      <p className="mt-1 text-lg font-semibold text-[#3E439C]">
+                    <div
+                      className={`rounded-xl p-4 ${dark ? "bg-[#222438]" : "bg-[#F6F6FC]"}`}
+                    >
+                      <p className={`text-sm ${mutedText}`}>Today's IP bills</p>
+                      <p className="mt-1 text-lg font-semibold text-[#3E439C] dark:text-[#B9B7FF]">
                         {summary.ip_bills_today}
                       </p>
                     </div>
                   </div>
                 </Panel>
 
-                {/* Recent bills */}
-
                 <Panel
                   title="Recent Bills"
-                  subtitle="The 10 most recently created or dated bills returned by the API"
+                  subtitle="The 10 most recently created or dated bills"
+                  dark={dark}
                 >
                   {dashboard.recent_bills.length > 0 ? (
                     <div className="-mx-4 overflow-x-auto sm:mx-0">
                       <table className="w-full min-w-[950px] border-collapse text-left">
                         <thead>
-                          <tr className="border-y border-gray-100 bg-[#FAFAFD]">
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Bill Number
-                            </th>
-
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Patient
-                            </th>
-
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Type
-                            </th>
-
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Date
-                            </th>
-
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Total
-                            </th>
-
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Paid
-                            </th>
-
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Balance
-                            </th>
-
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Status
-                            </th>
+                          <tr
+                            className={`border-y ${tableBorder} ${tableHeader}`}
+                          >
+                            {[
+                              "Bill Number",
+                              "Patient",
+                              "Type",
+                              "Date",
+                              "Total",
+                              "Paid",
+                              "Balance",
+                              "Status",
+                            ].map((heading) => (
+                              <th
+                                key={heading}
+                                className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide ${
+                                  ["Total", "Paid", "Balance"].includes(heading)
+                                    ? "text-right"
+                                    : "text-left"
+                                }`}
+                              >
+                                {heading}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
 
@@ -744,20 +759,21 @@ export default function Dashboard() {
                           {dashboard.recent_bills.map((bill) => (
                             <tr
                               key={bill.id}
-                              className="border-b border-gray-100 transition hover:bg-[#FAFAFD]"
+                              className={`border-b ${tableBorder} transition ${tableHover}`}
                             >
-                              <td className="px-3 py-3">
-                                <span className="font-medium text-[#3E439C]">
+                              <td className="whitespace-nowrap px-3 py-3">
+                                <span className="font-medium text-[#3E439C] dark:text-[#B9B7FF]">
                                   {bill.bill_number || `Bill #${bill.id}`}
                                 </span>
                               </td>
 
                               <td className="px-3 py-3">
-                                <p className="font-medium text-gray-800">
+                                <p className={`font-medium ${pageText}`}>
                                   {bill.patient_name || "—"}
                                 </p>
-
-                                <p className="mt-1 text-xs text-gray-400">
+                                <p
+                                  className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-gray-400"}`}
+                                >
                                   {bill.patient_id || "—"}
                                 </p>
                               </td>
@@ -766,27 +782,33 @@ export default function Dashboard() {
                                 <span
                                   className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
                                     bill.bill_type === "IP"
-                                      ? "bg-purple-50 text-purple-700"
-                                      : "bg-blue-50 text-blue-700"
+                                      ? "bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300"
+                                      : "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
                                   }`}
                                 >
                                   {bill.bill_type || "—"}
                                 </span>
                               </td>
 
-                              <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-sm ${dark ? "text-slate-300" : "text-gray-600"}`}
+                              >
                                 {formatDate(bill.bill_date)}
                               </td>
 
-                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-medium text-gray-800">
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right text-sm font-medium ${pageText}`}
+                              >
                                 {currency(bill.total_amount)}
                               </td>
 
-                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-green-700">
+                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-green-600 dark:text-green-400">
                                 {currency(bill.amount_paid)}
                               </td>
 
-                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-medium text-gray-800">
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right text-sm font-medium ${pageText}`}
+                              >
                                 {currency(bill.outstanding_amount)}
                               </td>
 
@@ -799,13 +821,15 @@ export default function Dashboard() {
                       </table>
                     </div>
                   ) : (
-                    <div className="py-8 text-center text-xs text-gray-500">
+                    <div className={`py-8 text-center text-xs ${mutedText}`}>
                       No bills available.
                     </div>
                   )}
                 </Panel>
 
-                <p className="text-right text-xs text-gray-400">
+                <p
+                  className={`text-right text-xs ${dark ? "text-slate-500" : "text-gray-400"}`}
+                >
                   {dashboard.generated_at
                     ? `Dashboard data date: ${formatDate(dashboard.generated_at)}`
                     : ""}
@@ -815,14 +839,6 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
-    </div>
-  );
-}
-
-function EmptyChart({ message }) {
-  return (
-    <div className="flex h-full min-h-[180px] items-center justify-center text-sm text-gray-400">
-      {message}
     </div>
   );
 }

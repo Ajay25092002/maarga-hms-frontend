@@ -13,6 +13,7 @@ import {
   X,
   LogOut,
   AlertCircle,
+  Tags,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
@@ -157,6 +158,15 @@ const settingsItems = [
     permission: "roles.view",
     isActive: (pathname) =>
       pathname === "/settings/roles" || pathname.startsWith("/settings/roles/"),
+  },
+  {
+    label: "Pricing Management",
+    path: "/settings/pricing",
+    icon: Tags,
+    permission: "pricing.view",
+    isActive: (pathname) =>
+      pathname === "/settings/pricing" ||
+      pathname.startsWith("/settings/pricing/"),
   },
 ];
 
@@ -449,10 +459,6 @@ export default function AppSidebar() {
 
   return (
     <>
-  
-
-  
-
       {/* Mobile and tablet full drawer */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] flex-col border-r border-slate-200 bg-white text-slate-700 shadow-xl transition-transform duration-200 dark:border-slate-700 dark:bg-[#171827] dark:text-slate-200 lg:hidden ${

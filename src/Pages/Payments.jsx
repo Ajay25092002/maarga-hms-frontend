@@ -76,7 +76,6 @@ export default function Payments() {
           <PaymentSummaryCards payments={summaryPayments} dark={dark}/>
           <PaymentFilters filters={filters} onChange={updateFilter} onReset={resetFilters} dark={dark}/>
           <PaymentsTable payments={payments} loading={loading} error={error} page={page} pagination={pagination} onPageChange={setPage} onView={(id) => navigate(`/payments/receipts/${id}`)} onRetry={() => setRefreshKey((v) => v + 1)} dark={dark}/>
-          <p className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>Summary cards reflect the payment rows on the current page, not the entire filtered dataset. The API does not currently expose a separate collection-summary endpoint.</p>
         </main>
       </div>
     </div>

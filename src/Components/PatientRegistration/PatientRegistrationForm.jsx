@@ -1,76 +1,31 @@
 import { useState } from "react";
-
-import { useNavigate } from "react-router-dom";
-
 import {
   UserRoundPlus,
   Phone,
   CalendarDays,
   MapPin,
-  ArrowLeft,
   RotateCcw,
-  Hash,
   Mail,
 } from "lucide-react";
-
 import { useTheme } from "../../Context/ThemeContext";
-
 import Loader from "../Common/Loader";
-
 import { useToast } from "../Common/useToast";
-
 import FullPageLoader from "../Common/FullPageLoader";
 
 const initialForm = {
   fullName: "",
-  registrationNumber: "",
-
   mobile: "",
-
   dateOfBirth: "",
-
-  age: "",
-
   gender: "",
-
   email: "",
-
   address: "",
-
-  city: "",
-
-  state: "",
-
-  pincode: "",
 };
-
-function calculateAge(dateOfBirth) {
-  if (!dateOfBirth) return "";
-
-  const today = new Date();
-
-  const dob = new Date(`${dateOfBirth}T00:00:00`);
-
-  if (Number.isNaN(dob.getTime()) || dob > today) return "";
-
-  let age = today.getFullYear() - dob.getFullYear();
-
-  if (
-    today.getMonth() < dob.getMonth() ||
-    (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
-  ) {
-    age -= 1;
-  }
-
-  return String(age);
-}
 
 function Field({ label, name, required, error, labelClass, children }) {
   return (
     <div className="min-w-0">
       <label htmlFor={name} className={labelClass}>
         {label}
-
         {required && <span className="ml-1 text-red-500">*</span>}
       </label>
 
@@ -92,18 +47,12 @@ function LeadingIcon({ icon: Icon, className = "" }) {
 }
 
 export default function PatientRegistrationForm() {
-  const navigate = useNavigate();
-
   const { theme } = useTheme();
-
   const isDark = theme === "dark";
 
-  const [form, setForm] = useState(initialForm);
-
+  const [form, setForm] = useState({ ...initialForm });
   const [errors, setErrors] = useState({});
-
   const [message, setMessage] = useState("");
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { showToast } = useToast();
@@ -118,36 +67,36 @@ export default function PatientRegistrationForm() {
       : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
   }`;
 
-  const mutedClass = isDark ? "text-slate-400" : "text-slate-400";
+  const mutedClass = "text-slate-400";
 
   const updateField = (event) => {
     const { name, value } = event.target;
 
     setForm((current) => ({
       ...current,
-
       [name]: value,
-
-      ...(name === "dateOfBirth" ? { age: calculateAge(value) } : {}),
     }));
 
     setErrors((current) => ({
       ...current,
-
       [name]: "",
-
-      ...(name === "dateOfBirth" ? { age: "" } : {}),
     }));
 
     setMessage("");
   };
 
-  const updateDigits = (event, name, maxLength) => {
-    const value = event.target.value.replace(/\D/g, "").slice(0, maxLength);
+  const updateMobile = (event) => {
+    const value = event.target.value.replace(/\D/g, "").slice(0, 10);
 
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => ({
+      ...current,
+      mobile: value,
+    }));
 
-    setErrors((current) => ({ ...current, [name]: "" }));
+    setErrors((current) => ({
+      ...current,
+      mobile: "",
+    }));
 
     setMessage("");
   };
@@ -161,17 +110,6 @@ export default function PatientRegistrationForm() {
 
     if (!/^[6-9]\d{9}$/.test(form.mobile)) {
       next.mobile = "Enter a valid 10-digit Indian mobile number.";
-    }
-
-    if (!form.dateOfBirth && form.age === "") {
-      next.age = "Enter age or date of birth.";
-    } else if (
-      form.age !== "" &&
-      (!Number.isInteger(Number(form.age)) ||
-        Number(form.age) < 0 ||
-        Number(form.age) > 120)
-    ) {
-      next.age = "Enter an age between 0 and 120.";
     }
 
     if (form.dateOfBirth) {
@@ -190,12 +128,7 @@ export default function PatientRegistrationForm() {
       next.email = "Enter a valid email address.";
     }
 
-    if (form.pincode && !/^\d{6}$/.test(form.pincode)) {
-      next.pincode = "Enter a valid 6-digit PIN code.";
-    }
-
     setErrors(next);
-
     return Object.keys(next).length === 0;
   };
 
@@ -209,10 +142,8 @@ export default function PatientRegistrationForm() {
     if (!validate()) {
       showToast({
         type: "warning",
-
         message: "Please correct the highlighted fields.",
       });
-
       return;
     }
 
@@ -222,41 +153,20 @@ export default function PatientRegistrationForm() {
       const API_BASE_URL =
         import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-      const Name = form.fullName.trim();
-
-      const addressParts = [
-        form.address.trim(),
-
-        form.city.trim(),
-
-        form.state.trim(),
-
-        form.pincode.trim(),
-      ].filter(Boolean);
-
       const payload = {
-        name: Name,
-
+        name: form.fullName.trim(),
         mobile: form.mobile,
-
         date_of_birth: form.dateOfBirth || null,
-
         gender: form.gender,
-
         email: form.email.trim() || null,
-
-        address: addressParts.join(", ") || null,
-
-        registration_number: form.registrationNumber.trim() || null,
+        address: form.address.trim() || null,
       };
 
       const response = await fetch(`${API_BASE_URL}/api/patients`, {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify(payload),
       });
 
@@ -281,42 +191,34 @@ export default function PatientRegistrationForm() {
 
       showToast({
         type: "success",
-
         title: "Patient registered",
-
         message: `Patient registered successfully.${patientId}`,
       });
 
       setErrors({});
-
-      setForm(initialForm);
+      setForm({ ...initialForm });
     } catch (error) {
       console.error("Patient registration failed:", error);
 
       showToast({
         type: "error",
-
         title: "Registration failed",
-
         message:
           error instanceof TypeError
             ? "Unable to connect to the server. Please check your connection and try again."
             : error.message || "Unable to register patient. Please try again.",
-
         duration: 6000,
       });
     } finally {
       setTimeout(() => {
         setIsSubmitting(false);
-      }, 2000); // Add a slight delay to ensure the toast is visible before re-enabling the button
+      }, 2000);
     }
   };
 
   const handleReset = () => {
-    setForm(initialForm);
-
+    setForm({ ...initialForm });
     setErrors({});
-
     setMessage("");
   };
 
@@ -338,7 +240,7 @@ export default function PatientRegistrationForm() {
               Patient Registration
             </h1>
 
-            <p className=" text-[13px] text-slate-500 dark:text-slate-400">
+            <p className="text-[13px] text-slate-500 dark:text-slate-400">
               Register patient details for hospital billing and visits
             </p>
           </div>
@@ -346,8 +248,6 @@ export default function PatientRegistrationForm() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
-        {/* Open page grid: intentionally no outer card or section heading. */}
-
         <div className="grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2">
           <Field
             label="Full Name"
@@ -369,26 +269,6 @@ export default function PatientRegistrationForm() {
           </Field>
 
           <Field
-            label="Registration Number"
-            name="registrationNumber"
-            error={errors.registrationNumber}
-            labelClass={labelClass}
-          >
-            <div className="relative">
-              <LeadingIcon icon={Hash} className={mutedClass} />
-              <input
-                id="registrationNumber"
-                name="registrationNumber"
-                value={form.registrationNumber}
-                onChange={updateField}
-                placeholder="Enter registration number (optional)"
-                maxLength={100}
-                className={`${inputClass} pl-10`}
-              />
-            </div>
-          </Field>
-
-          <Field
             label="Mobile Number"
             name="mobile"
             required
@@ -405,7 +285,7 @@ export default function PatientRegistrationForm() {
                 inputMode="numeric"
                 autoComplete="tel"
                 value={form.mobile}
-                onChange={(event) => updateDigits(event, "mobile", 10)}
+                onChange={updateMobile}
                 placeholder="10-digit mobile number"
                 maxLength={10}
                 className={`${inputClass} pl-10`}
@@ -435,29 +315,6 @@ export default function PatientRegistrationForm() {
           </Field>
 
           <Field
-            label={form.dateOfBirth ? "Age (calculated)" : "Age"}
-            name="age"
-            required={!form.dateOfBirth}
-            error={errors.age}
-            labelClass={labelClass}
-          >
-            <input
-              id="age"
-              name="age"
-              type="number"
-              min="0"
-              max="120"
-              value={form.age}
-              onChange={updateField}
-              readOnly={Boolean(form.dateOfBirth)}
-              placeholder="Enter age in years"
-              className={`${inputClass} ${
-                form.dateOfBirth ? "cursor-not-allowed opacity-70" : ""
-              }`}
-            />
-          </Field>
-
-          <Field
             label="Gender"
             name="gender"
             required
@@ -472,13 +329,9 @@ export default function PatientRegistrationForm() {
               className={inputClass}
             >
               <option value="">Select gender</option>
-
               <option value="Male">Male</option>
-
               <option value="Female">Female</option>
-
               <option value="Other">Other</option>
-
               <option value="Prefer not to say">Prefer not to say</option>
             </select>
           </Field>
@@ -525,7 +378,7 @@ export default function PatientRegistrationForm() {
                   rows={3}
                   value={form.address}
                   onChange={updateField}
-                  placeholder="House number, street, area and locality"
+                  placeholder="Enter house number, street, area, city and state"
                   maxLength={500}
                   className={`block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
                     isDark
@@ -536,58 +389,6 @@ export default function PatientRegistrationForm() {
               </div>
             </Field>
           </div>
-
-          <Field
-            label="City"
-            name="city"
-            error={errors.city}
-            labelClass={labelClass}
-          >
-            <input
-              id="city"
-              name="city"
-              value={form.city}
-              onChange={updateField}
-              placeholder="Enter city"
-              maxLength={100}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field
-            label="State"
-            name="state"
-            error={errors.state}
-            labelClass={labelClass}
-          >
-            <input
-              id="state"
-              name="state"
-              value={form.state}
-              onChange={updateField}
-              placeholder="Enter state"
-              maxLength={100}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field
-            label="PIN Code"
-            name="pincode"
-            error={errors.pincode}
-            labelClass={labelClass}
-          >
-            <input
-              id="pincode"
-              name="pincode"
-              inputMode="numeric"
-              value={form.pincode}
-              onChange={(event) => updateDigits(event, "pincode", 6)}
-              placeholder="6-digit PIN code"
-              maxLength={6}
-              className={inputClass}
-            />
-          </Field>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/80 pt-4 dark:border-slate-700">

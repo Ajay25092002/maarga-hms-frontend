@@ -1,4 +1,5 @@
-import { Printer, ArrowLeft, ReceiptText } from "lucide-react";
+
+import { Printer, ArrowLeft, ReceiptText, UserRound, CreditCard, CalendarDays } from "lucide-react";
 import {
   formatCurrency,
   formatDate,
@@ -14,124 +15,257 @@ export default function ReceiptPreview({
 }) {
   if (!payment) return null;
 
-  const label = dark ? "text-slate-400" : "text-slate-500";
+  const border = dark ? "border-slate-700" : "border-slate-200";
+  const text = dark ? "text-slate-100" : "text-slate-800";
+  const muted = dark ? "text-slate-400" : "text-slate-500";
+  const surface = dark ? "bg-[#171827]" : "bg-white";
+
+  const patientId = getPatientIdentifier(payment);
 
   const rows = [
-    ["Receipt number", payment.receipt_number || `RCT-${payment.id}`],
-    ["Payment date", formatDate(payment.payment_date, true)],
-    ["Patient name", getPatientName(payment)],
-    ["UHID / Registration number", getPatientIdentifier(payment)],
-    ["Bill number", payment.bill_number || `#${payment.bill_id}`],
-    ["Bill type", payment.bill_type || "—"],
-    ["Payment mode", payment.payment_method || "—"],
-    ["Reference number", payment.reference_number || "—"],
-    ["Bill total", formatCurrency(payment.bill_total)],
-    ["Total paid against bill", formatCurrency(payment.bill_amount_paid)],
-    ["Outstanding balance", formatCurrency(payment.bill_outstanding_amount)],
+    ["Receipt Number", payment.receipt_number || `RCT-${payment.id}`],
+    ["Payment Date", formatDate(payment.payment_date, true)],
+    ["Patient Name", getPatientName(payment)],
+    ["Patient ID / UHID", patientId],
+    ["Bill Number", payment.bill_number || `#${payment.bill_id}`],
+    ["Bill Type", payment.bill_type || "—"],
+    ["Payment Method", payment.payment_method || "—"],
+    ["Reference Number", payment.reference_number || "—"],
+  ];
+
+  const billRows = [
+    ["Bill Total", formatCurrency(payment.bill_total)],
+    ["Total Paid Against Bill", formatCurrency(payment.bill_amount_paid)],
+    ["Outstanding Balance", formatCurrency(payment.bill_outstanding_amount)],
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Page heading and actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <button
-          type="button"
-          onClick={onBack}
-          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
-            dark
-              ? "border-slate-700 text-slate-200"
-              : "border-slate-200 text-slate-700"
-          }`}
-        >
-          <ArrowLeft size={16} />
-          Back to payments
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
+            <ReceiptText
+              size={20}
+              className="text-[#3E439C] dark:text-[#D6D4FF]"
+            />
+          </span>
 
-        <button
-          type="button"
-          onClick={onPrintReceipt}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#3E439C] px-4 py-2 text-sm font-semibold text-white"
-        >
-          <Printer size={16} />
-          Print receipt
-        </button>
+          <div>
+            <h1 className={`text-lg font-semibold ${text}`}>
+              Receipt Details
+            </h1>
+            <p className={`mt-1 text-[13px] ${muted}`}>
+              View payment, patient and bill details
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition ${
+              dark
+                ? "border-slate-700 text-slate-200 hover:bg-slate-800"
+                : "border-slate-200 text-slate-700 hover:bg-white"
+            }`}
+          >
+            <ArrowLeft size={16} />
+            Back to Payments
+          </button>
+
+          <button
+            type="button"
+            onClick={onPrintReceipt}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white transition hover:bg-[#323780]"
+          >
+            <Printer size={16} />
+            Print Receipt
+          </button>
+        </div>
       </div>
 
-      <section className="receipt-print-area mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-5 text-slate-800 shadow-sm sm:p-8">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#3E439C]">
-              Maarga Mindcare
-            </p>
+      {/* Receipt document */}
+      <article
+        className={`receipt-print-area mx-auto w-full max-w-[1200px] space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
+      >
+        {/* Receipt header */}
+        <header
+          className={`flex flex-wrap items-start justify-between gap-4 border-b pb-5 ${border}`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
+              <ReceiptText
+                size={23}
+                className="text-[#3E439C] dark:text-[#D6D4FF]"
+              />
+            </span>
 
-            <h2 className="mt-2 text-2xl font-bold">
-              Payment Receipt
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Receipt for payment received against a hospital bill.
-            </p>
-          </div>
-
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F1F0FF] text-[#3E439C]">
-            <ReceiptText size={24} />
-          </span>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {rows.map(([labelText, valueText]) => (
-            <div
-              key={labelText}
-              className="min-w-0 border-b border-dashed border-slate-200 pb-2"
-            >
-              <p className="text-xs text-slate-500">
-                {labelText}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#3E439C] dark:text-[#B9B7FF]">
+                Maarga Mindcare
               </p>
 
-              <p className="mt-1 break-words text-sm font-medium">
-                {valueText}
+              <h2 className={`mt-1 text-lg font-bold ${text}`}>
+                PAYMENT RECEIPT
+              </h2>
+
+              <p className={`mt-1 text-xs ${muted}`}>
+                Receipt for payment received against a hospital bill.
+              </p>
+
+              <p className={`mt-3 text-sm font-semibold ${text}`}>
+                Receipt No: {payment.receipt_number || `RCT-${payment.id}`}
+              </p>
+
+              <p className={`mt-1 text-xs ${muted}`}>
+                Bill No: {payment.bill_number || `#${payment.bill_id}`}
               </p>
             </div>
-          ))}
-        </div>
+          </div>
 
-        <div className="mt-6 rounded-xl bg-[#F6F6FC] p-4">
-          <p className="text-sm text-slate-500">
-            Amount received
-          </p>
+          <div className="sm:min-w-[180px] sm:text-right">
+            <p className={`text-xs ${muted}`}>Payment Date</p>
+            <p className={`mt-1 text-sm font-medium ${text}`}>
+              {formatDate(payment.payment_date, true)}
+            </p>
 
-          <p className="mt-1 text-3xl font-bold text-[#3E439C]">
-            {formatCurrency(payment.amount)}
-          </p>
-
-          <p className="mt-2 text-xs text-slate-500">
-            This receipt reflects the payment record currently stored by the billing system.
-          </p>
-        </div>
-
-        {payment.notes && (
-          <div className="mt-5">
-            <p className="text-xs text-slate-500">Notes</p>
-
-            <p className="mt-1 whitespace-pre-wrap text-sm">
-              {payment.notes}
+            <p className={`mt-3 text-xs ${muted}`}>Payment Method</p>
+            <p className={`mt-1 text-sm font-medium ${text}`}>
+              {payment.payment_method || "—"}
             </p>
           </div>
+        </header>
+
+        {/* Patient and receipt information */}
+        <section className={`rounded-lg border p-4 sm:p-5 ${border}`}>
+          <div className="mb-4 flex items-center gap-2">
+            <UserRound
+              size={17}
+              className="text-[#3E439C] dark:text-[#B9B7FF]"
+            />
+            <h3 className={`text-sm font-semibold ${text}`}>
+              Patient & Receipt Information
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {rows.map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <p className={`mb-1 text-xs ${muted}`}>{label}</p>
+                <p className={`break-words text-sm font-medium ${text}`}>
+                  {value || "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Bill payment summary */}
+        <section className={`rounded-lg border p-4 sm:p-5 ${border}`}>
+          <div className="mb-4 flex items-center gap-2">
+            <CreditCard
+              size={17}
+              className="text-[#3E439C] dark:text-[#B9B7FF]"
+            />
+            <h3 className={`text-sm font-semibold ${text}`}>
+              Bill Payment Summary
+            </h3>
+          </div>
+
+          <div className="ml-auto w-full max-w-md space-y-3">
+            {billRows.map(([label, value], index) => (
+              <div
+                key={label}
+                className={`flex items-center justify-between gap-4 ${
+                  index === 2 ? `border-t pt-3 ${border}` : ""
+                }`}
+              >
+                <span
+                  className={`text-sm ${
+                    index === 2
+                      ? `font-semibold ${text}`
+                      : muted
+                  }`}
+                >
+                  {label}
+                </span>
+
+                <span
+                  className={`text-sm tabular-nums ${
+                    index === 2
+                      ? "font-bold text-amber-600"
+                      : text
+                  }`}
+                >
+                  {value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Amount received */}
+        <section
+          className={`rounded-lg border p-4 sm:p-5 ${border}`}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <ReceiptText
+              size={17}
+              className="text-[#3E439C] dark:text-[#B9B7FF]"
+            />
+            <h3 className={`text-sm font-semibold ${text}`}>
+              Payment Details
+            </h3>
+          </div>
+
+          <div
+            className={`flex flex-wrap items-center justify-between gap-4 border-t pt-4 ${border}`}
+          >
+            <div>
+              <p className={`text-sm ${muted}`}>Amount Received</p>
+              <p className="mt-1 text-2xl font-bold text-[#3E439C] dark:text-[#B9B7FF]">
+                {formatCurrency(payment.amount)}
+              </p>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <p className={`text-xs ${muted}`}>Receipt Status</p>
+              <span
+                className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-medium ${
+                  dark
+                    ? "border-emerald-800 bg-emerald-950/40 text-emerald-300"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                Payment Recorded
+              </span>
+            </div>
+          </div>
+
+          <p className={`mt-3 text-xs ${muted}`}>
+            This receipt reflects the payment record currently stored by
+            the billing system.
+          </p>
+        </section>
+
+        {/* Notes */}
+        {payment.notes && (
+          <section className={`border-t pt-4 ${border}`}>
+            <h3 className={`mb-2 text-sm font-semibold ${text}`}>
+              Notes
+            </h3>
+            <p className={`whitespace-pre-wrap text-sm ${muted}`}>
+              {payment.notes}
+            </p>
+          </section>
         )}
 
-        <div className="mt-12 flex justify-between gap-6 border-t border-slate-200 pt-4 text-xs text-slate-500">
-          <span>
-            Printed on: {formatDate(new Date().toISOString(), true)}
-          </span>
+   
+      </article>
 
-          <span className="text-right">
-            Authorized signature
-          </span>
-        </div>
-      </section>
 
-      <p className={`text-xs ${label} print:hidden`}>
-        The receipt PDF is generated by the backend billing API.
-      </p>
     </div>
   );
 }
