@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   ArrowLeft,
   AlertCircle,
@@ -13,11 +15,15 @@ import {
 } from "lucide-react";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
+
 import TopNavbar from "../Components/Layout/TopNavbar";
+
 import { useTheme } from "../Context/ThemeContext";
 
 // Billing endpoints run on port 8001 by default.
+
 // Override with VITE_API_BASE_URL.
+
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
@@ -25,8 +31,11 @@ const API_BASE_URL = (
 const currency = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
+
     currency: "INR",
+
     minimumFractionDigits: 2,
+
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 
@@ -34,12 +43,16 @@ const formatDate = (value, includeTime = false) => {
   if (!value) return "—";
 
   const parsed = new Date(value);
+
   if (Number.isNaN(parsed.getTime())) return "—";
 
   return parsed.toLocaleString("en-IN", {
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
+
     ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
 };
@@ -101,25 +114,43 @@ const getStatus = (bill) => {
 };
 
 /**
+
  * Resolves a service-group name from common API response shapes.
+
  *
+
  * If the API returns only a group ID, the backend must also return
+
  * the corresponding group name for the frontend to display it.
+
  */
+
 const getServiceGroupName = (item) => {
   const candidates = [
     item?.service_group_name,
+
     item?.service_group,
+
     item?.group_name,
+
     item?.serviceGroupName,
+
     item?.service_group?.name,
+
     item?.service_group?.group_name,
+
     item?.group?.name,
+
     item?.group?.group_name,
+
     item?.service?.service_group_name,
+
     item?.service?.service_group,
+
     item?.service?.group_name,
+
     item?.service?.service_group?.name,
+
     item?.service?.group?.name,
   ];
 
@@ -197,40 +228,58 @@ function SectionCard({ title, icon: Icon, children, dark, border }) {
 
 export default function IPBillDetails() {
   const { billId } = useParams();
+
   const navigate = useNavigate();
+
   const { theme } = useTheme();
+
   const dark = theme === "dark";
 
   const [bill, setBill] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
+
   const [refreshKey, setRefreshKey] = useState(0);
+
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const border = dark ? "border-slate-700" : "border-slate-200";
+
   const text = dark ? "text-slate-100" : "text-slate-800";
+
   const muted = dark ? "text-slate-400" : "text-slate-500";
+
   const surface = dark ? "bg-[#171827]" : "bg-white";
 
   const loadBill = useCallback(
     async (signal) => {
       if (!billId) {
         setError("Bill ID is missing.");
+
         setBill(null);
+
         setLoading(false);
+
         return;
       }
 
       setLoading(true);
+
       setError("");
 
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}`,
+
           {
             method: "GET",
+
             credentials: "include",
+
             headers: { Accept: "application/json" },
+
             signal,
           },
         );
@@ -241,6 +290,7 @@ export default function IPBillDetails() {
           throw new Error(
             getErrorMessage(
               data,
+
               `Unable to load bill (HTTP ${response.status}).`,
             ),
           );
@@ -259,7 +309,9 @@ export default function IPBillDetails() {
         if (err.name === "AbortError") return;
 
         console.error("Failed to load IP bill details:", err);
+
         setBill(null);
+
         setError(err.message || "Unable to load inpatient bill details.");
       } finally {
         if (!signal?.aborted) {
@@ -267,6 +319,7 @@ export default function IPBillDetails() {
         }
       }
     },
+
     [billId],
   );
 
@@ -280,11 +333,13 @@ export default function IPBillDetails() {
 
   const items = useMemo(
     () => (Array.isArray(bill?.items) ? bill.items : []),
+
     [bill],
   );
 
   const payments = useMemo(
     () => (Array.isArray(bill?.payments) ? bill.payments : []),
+
     [bill],
   );
 
@@ -297,27 +352,41 @@ export default function IPBillDetails() {
             item?.amount ??
               Number(item?.quantity ?? 0) * Number(item?.rate ?? 0),
           ),
+
         0,
       ),
   );
 
   const itemDiscount = items.reduce(
     (sum, item) => sum + Number(item?.discount_amount ?? 0),
+
     0,
   );
 
   const billDiscount = Number(bill?.discount_amount ?? 0);
+
+  const gstTotal = items.reduce(
+    (sum, item) => sum + Number(item?.gst_amount ?? 0),
+    0,
+  );
+
   const total = getTotal(bill);
+
   const paid = getPaid(bill);
+
   const outstanding = getOutstanding(bill);
+
   const status = getStatus(bill);
 
   const statusClass = {
     Paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+
     "Partially Paid":
       "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+
     Unpaid:
       "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+
     Cancelled:
       "border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
   }[status];
@@ -331,10 +400,12 @@ export default function IPBillDetails() {
       window.alert(
         "Your browser blocked the PDF tab. Allow pop-ups and try again.",
       );
+
       return;
     }
 
     printWindow.document.title = "IP Bill PDF";
+
     printWindow.document.body.innerHTML =
       '<p style="font-family:Arial,sans-serif;padding:24px">Preparing your IP bill PDF...</p>';
 
@@ -343,9 +414,12 @@ export default function IPBillDetails() {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/ip-pdf`,
+
         {
           method: "GET",
+
           credentials: "include",
+
           headers: { Accept: "application/pdf" },
         },
       );
@@ -358,6 +432,7 @@ export default function IPBillDetails() {
         if (contentType.includes("application/json")) {
           message = getErrorMessage(
             await response.json().catch(() => null),
+
             message,
           );
         } else {
@@ -384,11 +459,13 @@ export default function IPBillDetails() {
       }
 
       const pdfUrl = URL.createObjectURL(blob);
+
       printWindow.location.href = pdfUrl;
 
       window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10 * 60 * 1000);
     } catch (err) {
       console.error("Failed to open IP bill PDF:", err);
+
       printWindow.close();
 
       window.alert(
@@ -416,8 +493,11 @@ export default function IPBillDetails() {
           title="IP Bill Details"
           breadcrumb={[
             "Hospital Management",
+
             "Billing",
+
             "IP Bills",
+
             "Bill Details",
           ]}
         />
@@ -474,7 +554,9 @@ export default function IPBillDetails() {
             {loading ? (
               <div className="space-y-4" aria-live="polite">
                 <div className={`h-28 animate-pulse rounded-lg ${surface}`} />
+
                 <div className={`h-48 animate-pulse rounded-lg ${surface}`} />
+
                 <div className={`h-64 animate-pulse rounded-lg ${surface}`} />
 
                 <p className={`text-sm ${muted}`}>Loading inpatient bill...</p>
@@ -552,6 +634,7 @@ export default function IPBillDetails() {
                       <p className={`mt-1 text-xs ${muted}`}>
                         Patient ID: {getPatientId(bill)}
                       </p>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         IP Number: {displayValue(bill.ip_number)}
                       </p>
@@ -709,24 +792,38 @@ export default function IPBillDetails() {
                         <tr className={dark ? "bg-slate-800" : "bg-slate-50"}>
                           {[
                             "#",
+
                             "Service Group",
+
                             "Description",
+
                             "Service Date",
+
                             "Qty",
+
                             "Rate",
+
                             "Amount",
+
                             "Discount",
+
                             "Net Amount",
+                            "GST",
                           ].map((heading) => (
                             <th
                               key={heading}
                               className={`border-b px-3 py-3 text-xs font-semibold ${border} ${muted} ${
                                 [
                                   "Qty",
+
                                   "Rate",
+
                                   "Amount",
+
                                   "Discount",
+
                                   "Net Amount",
+                                  "GST",
                                 ].includes(heading)
                                   ? "text-right"
                                   : "text-left"
@@ -742,7 +839,7 @@ export default function IPBillDetails() {
                         {items.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={9}
+                              colSpan={10}
                               className={`px-3 py-8 text-center text-sm ${muted}`}
                             >
                               No itemized charges are available.
@@ -751,17 +848,22 @@ export default function IPBillDetails() {
                         ) : (
                           items.map((item, index) => {
                             const quantity = Number(item?.quantity ?? 0);
+
                             const rate = Number(item?.rate ?? 0);
+
                             const amount = Number(
                               item?.amount ?? quantity * rate,
                             );
+
                             const discountAmount = Number(
                               item?.discount_amount ?? 0,
                             );
+
                             const netAmount = Number(
                               item?.net_amount ??
                                 Math.max(0, amount - discountAmount),
                             );
+                            const gstAmount = Number(item?.gst_amount ?? 0);
 
                             return (
                               <tr
@@ -822,6 +924,12 @@ export default function IPBillDetails() {
                                 >
                                   {currency(netAmount)}
                                 </td>
+
+                                <td
+                                  className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
+                                >
+                                  {currency(gstAmount)}
+                                </td>
                               </tr>
                             );
                           })
@@ -834,6 +942,7 @@ export default function IPBillDetails() {
                 <section className="ml-auto w-full max-w-sm space-y-3">
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Subtotal</span>
+
                     <span className={`text-sm ${text}`}>
                       {currency(subtotal)}
                     </span>
@@ -842,6 +951,7 @@ export default function IPBillDetails() {
                   {itemDiscount > 0 && (
                     <div className="flex items-center justify-between gap-4">
                       <span className={`text-sm ${muted}`}>Item Discounts</span>
+
                       <span className={`text-sm ${text}`}>
                         {currency(itemDiscount)}
                       </span>
@@ -850,8 +960,16 @@ export default function IPBillDetails() {
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Bill Discount</span>
+
                     <span className={`text-sm ${text}`}>
                       {currency(billDiscount)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <span className={`text-sm ${muted}`}>GST</span>
+                    <span className={`text-sm ${text}`}>
+                      {currency(gstTotal)}
                     </span>
                   </div>
 
@@ -869,6 +987,7 @@ export default function IPBillDetails() {
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Amount Paid</span>
+
                     <span className={`text-sm ${text}`}>{currency(paid)}</span>
                   </div>
 
@@ -904,10 +1023,15 @@ export default function IPBillDetails() {
                       <table className="w-full min-w-[800px] table-fixed border-collapse text-sm">
                         <colgroup>
                           <col className="w-[16%]" />
+
                           <col className="w-[24%]" />
+
                           <col className="w-[14%]" />
+
                           <col className="w-[18%]" />
+
                           <col className="w-[14%]" />
+
                           <col className="w-[14%]" />
                         </colgroup>
 
@@ -917,10 +1041,15 @@ export default function IPBillDetails() {
                           <tr>
                             {[
                               "Receipt No.",
+
                               "Payment Date",
+
                               "Method",
+
                               "Reference",
+
                               "Amount",
+
                               "Notes",
                             ].map((heading) => (
                               <th

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import { useNavigate } from "react-router-dom";
-
 import {
   ArrowLeft,
   CheckCircle2,
@@ -14,18 +12,13 @@ import {
   BedDouble,
   RefreshCw,
 } from "lucide-react";
-
 import AppSidebar from "../Components/Layout/AppSidebar";
-
 import TopNavbar from "../Components/Layout/TopNavbar";
-
 import { useTheme } from "../Context/ThemeContext";
-
 import Loader from "../Components/Common/Loader";
-
 import FullPageLoader from "../Components/Common/FullPageLoader";
-
 import { useToast } from "../Components/Common/useToast";
+import SearchableDropdown from "../Components/Common/SearchableDropdown";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http\://localhost:8001"
@@ -43,19 +36,13 @@ const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const createCharge = () => ({
   id: makeId(),
-
   service_id: "",
-
   description: "",
-
   quantity: "1",
-
   rate: "",
-
   discount_amount: "0",
-
+  gst_amount: "0",
   priceLoading: false,
-
   priceError: "",
 });
 
@@ -250,6 +237,60 @@ export default function CreateIPBill() {
     dark ? "text-slate-300" : "text-slate-600"
   }`;
 
+  const isGstEligible = (category, item) => {
+    const group = serviceGroups.find(
+      (entry) => String(getId(entry)) === String(category.service_group_id),
+    );
+
+    const service = services.find(
+      (entry) => String(getId(entry)) === String(item.service_id),
+    );
+
+    return (
+      getName(group).trim().toUpperCase() === "ACCOMMODATION CHARGES" &&
+      getName(service).trim().toUpperCase() === "ROOM RENT"
+    );
+  };
+
+  const fetchIPServices = useCallback(
+    async (groupId, search, { signal } = {}) => {
+      if (!groupId) return [];
+
+      const params = new URLSearchParams({
+        service_group_id: String(groupId),
+        bill_type: "IP",
+        search: search.trim(),
+        page: "1",
+        page_size: "10",
+        is_active: "true",
+      });
+
+      const data = await apiRequest(`/api/services?${params.toString()}`, {
+        signal,
+      });
+
+      const results = unwrapList(data).filter(
+        (service) =>
+          service.is_active !== false && service.available_for_ip !== false,
+      );
+
+      setServices((current) => {
+        const byId = new Map(
+          current.map((service) => [String(getId(service)), service]),
+        );
+
+        results.forEach((service) => {
+          byId.set(String(getId(service)), service);
+        });
+
+        return Array.from(byId.values());
+      });
+
+      return results;
+    },
+    [],
+  );
+
   const loadPatients = useCallback(
     async (signal) => {
       setPatientsLoading(true);
@@ -292,25 +333,14 @@ export default function CreateIPBill() {
     setMastersError("");
 
     try {
-      const [groupsData, servicesData, roomTypesData, doctorsData] =
-        await Promise.all([
-          apiRequest("/api/service-groups", { signal }),
-
-          apiRequest("/api/services", { signal }),
-
-          apiRequest("/api/room-types", { signal }),
-
-          apiRequest("/api/doctors", { signal }),
-        ]);
+      const [groupsData, roomTypesData, doctorsData] = await Promise.all([
+        apiRequest("/api/service-groups", { signal }),
+        apiRequest("/api/room-types", { signal }),
+        apiRequest("/api/doctors", { signal }),
+      ]);
 
       setServiceGroups(
         unwrapList(groupsData).filter((item) => item.is_active !== false),
-      );
-
-      setServices(
-        unwrapList(servicesData).filter(
-          (item) => item.is_active !== false && item.available_for_ip !== false,
-        ),
       );
 
       setRoomTypes(
@@ -325,7 +355,7 @@ export default function CreateIPBill() {
 
       setMastersError(
         error.message ||
-          "Unable to load service groups, services, and room types.",
+          "Unable to load service groups, room types, and doctors.",
       );
     } finally {
       if (!signal?.aborted) setMastersLoading(false);
@@ -359,17 +389,6 @@ export default function CreateIPBill() {
 
     return records.slice(0, 8);
   }, [patients, patientQuery]);
-
-  const getServicesForGroup = useCallback(
-    (groupId) =>
-      services.filter(
-        (service) =>
-          String(service.service_group_id ?? service.group_id ?? "") ===
-          String(groupId),
-      ),
-
-    [services],
-  );
 
   const updateCategory = (categoryId, updates) => {
     setCategories((current) =>
@@ -448,6 +467,7 @@ export default function CreateIPBill() {
         description: "",
 
         rate: "",
+        gst_amount: "0",
 
         priceLoading: false,
 
@@ -460,11 +480,9 @@ export default function CreateIPBill() {
     if (!roomTypeId) {
       updateCharge(categoryId, chargeId, {
         service_id: serviceId,
-
         rate: "",
-
+        gst_amount: "0",
         priceLoading: false,
-
         priceError: "Select a room type before choosing a service.",
       });
 
@@ -477,13 +495,10 @@ export default function CreateIPBill() {
 
     updateCharge(categoryId, chargeId, {
       service_id: String(serviceId),
-
       description: getName(service),
-
       rate: "",
-
+      gst_amount: "0",
       priceLoading: true,
-
       priceError: "",
     });
 
@@ -598,25 +613,26 @@ export default function CreateIPBill() {
 
           const discount = Math.min(gross, requestedDiscount);
 
+          const gst = isGstEligible(category, item)
+            ? Math.max(0, Number(item.gst_amount) || 0)
+            : 0;
+
           return {
             id: item.id,
-
             gross,
-
             discount,
-
+            gst,
             net: Math.max(0, gross - discount),
+            total: Math.max(0, gross - discount) + gst,
           };
         });
 
         return {
           id: category.id,
-
           subtotal: lines.reduce((sum, line) => sum + line.gross, 0),
-
           discount: lines.reduce((sum, line) => sum + line.discount, 0),
-
-          total: lines.reduce((sum, line) => sum + line.net, 0),
+          gst: lines.reduce((sum, line) => sum + line.gst, 0),
+          total: lines.reduce((sum, line) => sum + line.total, 0),
         };
       }),
 
@@ -636,12 +652,16 @@ export default function CreateIPBill() {
       0,
     );
 
+    const gst = categorySummaries.reduce(
+      (sum, category) => sum + category.gst,
+      0,
+    );
+
     return {
       subtotal,
-
       discount,
-
-      total: Math.max(0, subtotal - discount),
+      gst,
+      total: Math.max(0, subtotal - discount) + gst,
     };
   }, [categorySummaries]);
 
@@ -725,6 +745,12 @@ export default function CreateIPBill() {
           "Each discount must be non-negative and cannot exceed the charge amount.",
         );
       }
+
+      const gst = Number(item.gst_amount || 0);
+
+      if (!Number.isFinite(gst) || gst < 0) {
+        return fail("GST must be a valid non-negative amount.");
+      }
     }
 
     if (billSummary.total <= 0) {
@@ -744,15 +770,21 @@ export default function CreateIPBill() {
 
         .filter((item) => item.service_id)
 
-        .map((item) => ({
-          service_id: Number(item.service_id),
+        .map((item) => {
+          const category = categories.find((entry) =>
+            entry.items.some((charge) => charge.id === item.id),
+          );
 
-          service_date: billDate,
+          const gstEligible = category ? isGstEligible(category, item) : false;
 
-          quantity: Number(item.quantity),
-
-          discount_amount: Number(item.discount_amount || 0),
-        })),
+          return {
+            service_id: Number(item.service_id),
+            service_date: billDate,
+            quantity: Number(item.quantity),
+            discount_amount: Number(item.discount_amount || 0),
+            gst_amount: gstEligible ? Number(item.gst_amount || 0) : 0,
+          };
+        }),
     );
 
     const payload = {
@@ -1170,10 +1202,6 @@ export default function CreateIPBill() {
                     (item) => item.id === category.id,
                   );
 
-                  const groupServices = getServicesForGroup(
-                    category.service_group_id,
-                  );
-
                   return (
                     <div
                       key={category.id}
@@ -1195,7 +1223,7 @@ export default function CreateIPBill() {
                         </button>
                       </div>
 
-                      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="mb-5 grid grid-cols-1  gap-2 md:grid-cols-1">
                         <div>
                           <label className={labelClass}>Service Group *</label>
 
@@ -1207,15 +1235,11 @@ export default function CreateIPBill() {
 
                                 items: category.items.map((item) => ({
                                   ...item,
-
                                   service_id: "",
-
                                   description: "",
-
                                   rate: "",
-
+                                  gst_amount: "0",
                                   priceLoading: false,
-
                                   priceError: "",
                                 })),
                               });
@@ -1233,11 +1257,11 @@ export default function CreateIPBill() {
                           </select>
                         </div>
 
-                        <div className="flex items-end">
+                        <div className="flex ">
                           <p className={`text-xs ${muted}`}>
                             {category.service_group_id
-                              ? `${groupServices.length} available IP service(s) in this group.`
-                              : "Select a service group to load its services."}
+                              ? "Search to find an IP service in this group."
+                              : "Select a service group to search its services."}
                           </p>
                         </div>
                       </div>
@@ -1283,6 +1307,12 @@ export default function CreateIPBill() {
                               <th
                                 className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
                               >
+                                GST (₹)
+                              </th>
+
+                              <th
+                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                              >
                                 Net Amount
                               </th>
 
@@ -1310,48 +1340,61 @@ export default function CreateIPBill() {
 
                               const net = Math.max(0, gross - discount);
 
+                              const gstEligible = isGstEligible(category, item);
+                              const gstAmount = gstEligible
+                                ? Math.max(0, Number(item.gst_amount) || 0)
+                                : 0;
+
+                              const netWithGst = net + gstAmount;
+
                               return (
                                 <tr
                                   key={item.id}
                                   className={`border-t ${border}`}
                                 >
                                   <td className="px-3 py-3">
-                                    <select
-                                      value={item.service_id}
+                                    <SearchableDropdown
+                                      value={
+                                        services.find(
+                                          (service) =>
+                                            String(getId(service)) ===
+                                            String(item.service_id),
+                                        ) ?? null
+                                      }
+                                      onChange={(service) =>
+                                        resolvePrice(
+                                          category.id,
+                                          item.id,
+                                          service ? getId(service) : "",
+                                        )
+                                      }
+                                      fetchOptions={(search, options) =>
+                                        fetchIPServices(
+                                          category.service_group_id,
+                                          search,
+                                          options,
+                                        )
+                                      }
+                                      getOptionLabel={getName}
+                                      getOptionValue={getId}
+                                      placeholder={
+                                        !category.service_group_id
+                                          ? "Select group first"
+                                          : !roomTypeId
+                                            ? "Select room type first"
+                                            : "Select service"
+                                      }
+                                      searchPlaceholder="Search IP services..."
+                                      emptyMessage="No matching IP services found."
+                                      loadingMessage="Searching services..."
                                       disabled={
                                         !category.service_group_id ||
                                         !roomTypeId ||
                                         item.priceLoading
                                       }
-                                      onChange={(event) =>
-                                        resolvePrice(
-                                          category.id,
-
-                                          item.id,
-
-                                          event.target.value,
-                                        )
-                                      }
-                                      className={inputClass}
-                                      required
-                                    >
-                                      <option value="">
-                                        {!category.service_group_id
-                                          ? "Select group first"
-                                          : !roomTypeId
-                                            ? "Select room type first"
-                                            : "Select service"}
-                                      </option>
-
-                                      {groupServices.map((service) => (
-                                        <option
-                                          key={getId(service)}
-                                          value={getId(service)}
-                                        >
-                                          {getName(service)}
-                                        </option>
-                                      ))}
-                                    </select>
+                                      minSearchLength={0}
+                                      className="w-full py-0"
+                                    />
 
                                     {item.priceLoading && (
                                       <p
@@ -1424,10 +1467,27 @@ export default function CreateIPBill() {
                                     />
                                   </td>
 
+                                  <td className="px-3 py-3">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.gst_amount}
+                                      disabled={!gstEligible}
+                                      onChange={(event) =>
+                                        updateCharge(category.id, item.id, {
+                                          gst_amount: event.target.value,
+                                        })
+                                      }
+                                      className={`${inputClass} text-right disabled:cursor-not-allowed disabled:opacity-50`}
+                                      aria-label="GST amount"
+                                    />
+                                  </td>
+
                                   <td
                                     className={`px-3 py-3 text-right font-semibold ${text}`}
                                   >
-                                    {currency(net)}
+                                    {currency(netWithGst)}
                                   </td>
 
                                   <td className="px-2 py-3 text-center">
@@ -1564,6 +1624,11 @@ export default function CreateIPBill() {
                       <span className="font-medium text-red-600 dark:text-red-400">
                         − {currency(billSummary.discount)}
                       </span>
+                    </div>
+
+                    <div className={`flex justify-between text-sm ${muted}`}>
+                      <span>Total GST</span>
+                      <span className={text}>{currency(billSummary.gst)}</span>
                     </div>
 
                     <div

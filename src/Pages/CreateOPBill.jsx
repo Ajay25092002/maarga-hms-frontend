@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
-
+import SearchableDropdown from "../Components/Common/SearchableDropdown";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
 import { useTheme } from "../Context/ThemeContext";
@@ -248,50 +248,83 @@ export default function CreateOPBill() {
   const loadMasters = useCallback(async (signal) => {
     setMastersLoading(true);
     setMastersError("");
+
     try {
-      const [doctorsResponse, servicesResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/doctors`, {
-          credentials: "include",
-          headers: { Accept: "application/json" },
-          signal,
-        }),
-        fetch(`${API_BASE_URL}/api/services`, {
-          credentials: "include",
-          headers: { Accept: "application/json" },
-          signal,
-        }),
-      ]);
-      const [doctorsData, servicesData] = await Promise.all([
-        doctorsResponse.json().catch(() => null),
-        servicesResponse.json().catch(() => null),
-      ]);
-      if (!doctorsResponse.ok)
+      const response = await fetch(`${API_BASE_URL}/api/doctors`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
         throw new Error(
-          doctorsData?.detail ||
-            `Unable to load doctors (${doctorsResponse.status}).`,
+          data?.detail || `Unable to load doctors (${response.status}).`,
         );
-      if (!servicesResponse.ok)
-        throw new Error(
-          servicesData?.detail ||
-            `Unable to load services (${servicesResponse.status}).`,
-        );
+      }
+
       setDoctors(
-        unwrapList(doctorsData).filter((doctor) => doctor.is_active !== false),
-      );
-      setServices(
-        unwrapList(servicesData).filter(
-          (service) =>
-            service.is_active !== false && service.available_for_op !== false,
-        ),
+        unwrapList(data).filter((doctor) => doctor.is_active !== false),
       );
     } catch (error) {
       if (error.name === "AbortError") return;
-      setMastersError(
-        error.message || "Unable to load doctors and OP services.",
-      );
+      setMastersError(error.message || "Unable to load doctors.");
     } finally {
       if (!signal?.aborted) setMastersLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadMasters(controller.signal);
+    return () => controller.abort();
+  }, [loadMasters]);
+
+  const fetchOPServices = useCallback(async (search, { signal } = {}) => {
+    const params = new URLSearchParams({
+      bill_type: "OP",
+      search: search.trim(),
+      page: "1",
+      page_size: "10",
+      is_active: "true",
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/services?${params.toString()}`,
+      {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal,
+      },
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.detail || `Unable to search OP services (${response.status}).`,
+      );
+    }
+
+    const results = unwrapList(data).filter(
+      (service) =>
+        service.is_active !== false && service.available_for_op !== false,
+    );
+
+    setServices((current) => {
+      const byId = new Map(
+        current.map((service) => [String(recordId(service)), service]),
+      );
+
+      results.forEach((service) => {
+        byId.set(String(recordId(service)), service);
+      });
+
+      return Array.from(byId.values());
+    });
+
+    return results;
   }, []);
 
   useEffect(() => {
@@ -684,11 +717,11 @@ export default function CreateOPBill() {
       notes: notes.trim() || null,
 
       items: completedItems.map((item) => ({
-      service_id: Number(item.service_id),
-      service_date: billDate,
-      quantity: Number(item.quantity),
-      discount_amount: Number(item.discount_amount || 0),
-    })),
+        service_id: Number(item.service_id),
+        service_date: billDate,
+        quantity: Number(item.quantity),
+        discount_amount: Number(item.discount_amount || 0),
+      })),
     };
 
     setIsSubmitting(true);
@@ -1147,38 +1180,40 @@ export default function CreateOPBill() {
                         return (
                           <tr key={item.id} className={`border-t ${border}`}>
                             <td className="px-3 py-2.5">
-                              <select
-                                value={item.service_id || ""}
-                                onChange={(event) =>
+                              <SearchableDropdown
+                                value={
+                                  services.find(
+                                    (service) =>
+                                      String(recordId(service)) ===
+                                      String(item.service_id),
+                                  ) ?? null
+                                }
+                                onChange={(service) =>
                                   resolveServicePrice(
                                     item.id,
-                                    event.target.value,
+                                    service ? recordId(service) : "",
                                     doctorId,
                                   )
                                 }
+                                fetchOptions={fetchOPServices}
+                                getOptionLabel={recordName}
+                                getOptionValue={recordId}
+                                placeholder={
+                                  !doctorId
+                                    ? "Select doctor first"
+                                    : "Select OP service"
+                                }
+                                searchPlaceholder="Search OP services..."
+                                emptyMessage="No matching OP services found."
+                                loadingMessage="Searching OP services..."
                                 disabled={
                                   !doctorId ||
                                   mastersLoading ||
                                   item.priceLoading
                                 }
-                                className={inputClass}
-                              >
-                                <option value="">
-                                  {!doctorId
-                                    ? "Select doctor first"
-                                    : mastersLoading
-                                      ? "Loading OP services..."
-                                      : "Select OP service"}
-                                </option>
-                                {services.map((service) => (
-                                  <option
-                                    key={recordId(service)}
-                                    value={recordId(service)}
-                                  >
-                                    {recordName(service)}
-                                  </option>
-                                ))}
-                              </select>
+                                minSearchLength={0}
+                                className="w-full"
+                              />
                               {item.priceLoading && (
                                 <p className={`mt-1 text-xs ${muted}`}>
                                   Loading applicable OP price...
