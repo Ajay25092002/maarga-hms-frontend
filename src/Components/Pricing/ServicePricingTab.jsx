@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
+
 import ConfirmDialog from "../Common/ConfirmDialog";
+import SearchableDropdown from "../Common/SearchableDropdown";
 
 import {
   serviceGroupsApi,
@@ -137,6 +139,7 @@ export default function ServicePricingTab({
   const [editingPrice, setEditingPrice] = useState(null);
 
   const [form, setForm] = useState(emptyForm);
+  const [selectedService, setSelectedService] = useState(null);
 
   const styles = useMemo(
     () => ({
@@ -223,24 +226,24 @@ export default function ServicePricingTab({
 
       const requestedGroup = options.group ?? groupFilter;
 
-      
-
       setLoading(true);
 
       setError("");
 
       try {
         const params = {
-        page: requestedPage,
-        page_size: PAGE_SIZE,
-        search: requestedSearch.trim() || undefined,
-        bill_type: requestedBillType === "all" ? undefined : requestedBillType,
-        is_active:
-          requestedStatus === "all" ? undefined : requestedStatus === "active",
-        service_group_id:
-          requestedGroup === "all" ? undefined : Number(requestedGroup),
-      };
-   
+          page: requestedPage,
+          page_size: PAGE_SIZE,
+          search: requestedSearch.trim() || undefined,
+          bill_type:
+            requestedBillType === "all" ? undefined : requestedBillType,
+          is_active:
+            requestedStatus === "all"
+              ? undefined
+              : requestedStatus === "active",
+          service_group_id:
+            requestedGroup === "all" ? undefined : Number(requestedGroup),
+        };
 
         const response = await servicePricingApi.list(params);
 
@@ -282,7 +285,7 @@ export default function ServicePricingTab({
       }
     },
 
-[page, search, billTypeFilter, groupFilter, statusFilter],
+    [page, search, billTypeFilter, groupFilter, statusFilter],
   );
 
   useEffect(() => {
@@ -389,8 +392,19 @@ export default function ServicePricingTab({
     return "—";
   };
 
+  const fetchServiceOptions = useCallback(async (query, { signal } = {}) => {
+    const response = await servicesApi.list({
+      page: 1,
+      page_size: 10,
+      search: query.trim() || undefined,
+    });
 
+    if (signal?.aborted) return [];
 
+    const items = getItems(response);
+
+    return items.filter((service) => service.is_active !== false);
+  }, []);
 
   const eligibleServices = services.filter(
     (service) => service.is_active !== false,
@@ -637,15 +651,10 @@ export default function ServicePricingTab({
     }
   };
 
-const firstRow =
-  pagination.total === 0
-    ? 0
-    : (page - 1) * pagination.pageSize + 1;
+  const firstRow =
+    pagination.total === 0 ? 0 : (page - 1) * pagination.pageSize + 1;
 
-const lastRow = Math.min(
-  page * pagination.pageSize,
-  pagination.total,
-);
+  const lastRow = Math.min(page * pagination.pageSize, pagination.total);
 
   // -------------------------------------------------------
 
@@ -1001,29 +1010,39 @@ const lastRow = Math.min(
                   htmlFor="price-service"
                   className={`mb-1.5 block text-sm font-medium ${styles.heading}`}
                 >
-                  Service <span className="text-red-500">\*</span>
+                  Service <span className="text-red-500">*</span>
                 </label>
 
-                <select
-                  id="price-service"
-                  required
-                  value={form.service_id}
-                  onChange={(event) =>
-                    updateForm("service_id", event.target.value)
+                <SearchableDropdown
+                  value={
+                    selectedService &&
+                    String(selectedService.id) === String(form.service_id)
+                      ? selectedService
+                      : eligibleServices.find(
+                          (service) => String(service.id) === String(form.service_id),
+                        ) ??
+                        editingPrice?.service ??
+                        (editingPrice
+                          ? {
+                              id: editingPrice.service_id,
+                              name: editingPrice.service_name ?? "",
+                            }
+                          : null)
                   }
+                  onChange={(service) => {
+                    setSelectedService(service);
+                    updateForm("service_id", service ? String(service.id) : "");
+                  }}
+                  fetchOptions={fetchServiceOptions}
+                  getOptionLabel={(service) => service.name ?? ""}
+                  getOptionValue={(service) => service.id}
+                  placeholder="Select service"
+                  searchPlaceholder="Search services..."
+                  emptyMessage="No matching services found."
+                  loadingMessage="Loading services..."
                   disabled={lookupsLoading}
-                  className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-[#3E439C] ${styles.input}`}
-                >
-                  <option value="">
-                    {lookupsLoading ? "Loading services..." : "Select service"}
-                  </option>
-
-                  {eligibleServices.map((service) => (
-                    <option key={service.id} value={String(service.id)}>
-                      {service.name}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                />
               </div>
 
               <div>
@@ -1031,7 +1050,7 @@ const lastRow = Math.min(
                   htmlFor="price-bill-type"
                   className={`mb-1.5 block text-sm font-medium ${styles.heading}`}
                 >
-                  Billing type <span className="text-red-500">\*</span>
+                  Billing type <span className="text-red-500">*</span>
                 </label>
 
                 <select
@@ -1122,7 +1141,7 @@ const lastRow = Math.min(
                   htmlFor="price-amount"
                   className={`mb-1.5 block text-sm font-medium ${styles.heading}`}
                 >
-                  Amount (₹) <span className="text-red-500">\*</span>
+                  Amount (₹) <span className="text-red-500">*</span>
                 </label>
 
                 <input

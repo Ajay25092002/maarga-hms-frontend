@@ -24,6 +24,19 @@ const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http\://localhost:8001"
 ).replace(/\/$/, "");
 
+const REQUIRED_IP_SERVICES = [
+  "NURSING CHARGES",
+  "HOLISTIC THERAPIES",
+  "DIET & FOOD",
+  "PSYCHIATRIC CONSULTATION/TREATMENT",
+  "PSYCHOLOGIST COUNSELLING/TREATMENT",
+  "RECREATION ACTVITIES/THERAPY",
+  "DOCTOR CONSULTATION",
+  "MRD CHARGES",
+  "ADMISSION CHARGES",
+
+];
+
 const today = () => {
   const now = new Date();
 
@@ -212,6 +225,8 @@ export default function CreateIPBill() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [savedBill, setSavedBill] = useState(null);
+  const [isLoadingRequiredServices, setIsLoadingRequiredServices] =
+  useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -545,55 +560,208 @@ export default function CreateIPBill() {
     }
   };
 
-  // If the room type changes, every selected service must be repriced.
+  
+const autoPopulateIPServices = async (selectedRoomTypeId) => {
+  if (!selectedRoomTypeId || mastersLoading) return;
 
-  useEffect(() => {
-    if (!roomTypeId) {
-      setCategories((current) =>
-        current.map((category) => ({
-          ...category,
+  setIsLoadingRequiredServices(true);
+  setMastersError("");
 
-          items: category.items.map((item) => ({
-            ...item,
+  try {
+    // Step 1: Search for all required services concurrently.
+    const serviceSearchTasks = serviceGroups.flatMap((group) => {
+      const groupId = getId(group);
 
-            rate: "",
+      return REQUIRED_IP_SERVICES.map(async (serviceName) => {
+        const params = new URLSearchParams({
+          service_group_id: String(groupId),
+          bill_type: "IP",
+          search: serviceName,
+          page: "1",
+          page_size: "10",
+          is_active: "true",
+        });
 
-            priceLoading: false,
+        const data = await apiRequest(
+          `/api/services?${params.toString()}`
+        );
 
-            priceError: item.service_id
-              ? "Select a room type to retrieve the price."
-              : "",
-          })),
-        })),
+        const matches = unwrapList(data).filter(
+          (service) =>
+            service.is_active !== false &&
+            service.available_for_ip !== false &&
+            getName(service).trim().toUpperCase() === serviceName
+        );
+
+        return {
+          groupId: String(groupId),
+          services: matches,
+        };
+      });
+    });
+
+    // Continue even if an individual service search fails.
+    const searchResults = await Promise.allSettled(serviceSearchTasks);
+
+    const fetchedServices = [];
+    const servicesByGroup = new Map();
+    const searchErrors = [];
+
+    searchResults.forEach((result) => {
+      if (result.status === "rejected") {
+        searchErrors.push(result.reason);
+        return;
+      }
+
+      const { groupId, services: matches } = result.value;
+
+      if (!servicesByGroup.has(groupId)) {
+        servicesByGroup.set(groupId, []);
+      }
+
+      const groupServices = servicesByGroup.get(groupId);
+
+      matches.forEach((service) => {
+        const serviceId = String(getId(service));
+
+        // Avoid duplicate services within the same group.
+        if (
+          !groupServices.some(
+            (existing) => String(getId(existing)) === serviceId
+          )
+        ) {
+          groupServices.push(service);
+          fetchedServices.push(service);
+        }
+      });
+    });
+
+    if (fetchedServices.length === 0) {
+      throw new Error(
+        searchErrors.length
+          ? "Unable to retrieve the required IP services. Please try again."
+          : "No matching IP services were found for automatic selection."
       );
-
-      return;
     }
 
-    const selected = categories.flatMap((category) =>
-      category.items
+    // Step 2: Fetch all service prices concurrently.
+    const priceResults = await Promise.all(
+      serviceGroups.map(async (group) => {
+        const groupId = String(getId(group));
+        const matchedServices = servicesByGroup.get(groupId) || [];
 
-        .filter((item) => item.service_id)
+        if (matchedServices.length === 0) return null;
 
-        .map((item) => ({
-          categoryId: category.id,
+        const items = await Promise.all(
+          matchedServices.map(async (service) => {
+            try {
+              const params = new URLSearchParams({
+                service_id: String(getId(service)),
+                bill_type: "IP",
+                room_type_id: String(selectedRoomTypeId),
+              });
 
-          chargeId: item.id,
+              const priceData = await apiRequest(
+                `/api/billing/service-price?${params.toString()}`
+              );
 
-          serviceId: item.service_id,
+              return {
+                ...createCharge(),
+                service_id: String(getId(service)),
+                description: getName(service),
+                rate: String(getPrice(priceData)),
+                quantity: "1",
+                discount_amount: "0",
+                gst_amount: "0",
+                priceLoading: false,
+                priceError: "",
+              };
+            } catch (error) {
+              return {
+                ...createCharge(),
+                service_id: String(getId(service)),
+                description: getName(service),
+                rate: "",
+                quantity: "1",
+                discount_amount: "0",
+                gst_amount: "0",
+                priceLoading: false,
+                priceError:
+                  error.message ||
+                  "No applicable price exists for this service and room type.",
+              };
+            }
+          })
+        );
+
+        return {
+          ...createCategory(),
+          service_group_id: groupId,
+          items,
+        };
+      })
+    );
+
+    const populatedCategories = priceResults.filter(Boolean);
+
+    // Make fetched services available to the dropdowns.
+    setServices((current) => {
+      const byId = new Map(
+        current.map((service) => [String(getId(service)), service])
+      );
+
+      fetchedServices.forEach((service) => {
+        byId.set(String(getId(service)), service);
+      });
+
+      return Array.from(byId.values());
+    });
+
+    // Update the displayed categories once.
+    setCategories(populatedCategories);
+
+    if (searchErrors.length > 0) {
+      setMastersError(
+        "Some service searches failed. Please review the loaded services."
+      );
+    }
+  } catch (error) {
+    setMastersError(
+      error.message || "Unable to automatically populate IP services."
+    );
+  } finally {
+    setIsLoadingRequiredServices(false);
+  }
+};
+
+
+  // If the room type changes, every selected service must be repriced.
+
+
+useEffect(() => {
+  if (!roomTypeId) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) => ({
+          ...item,
+          rate: "",
+          priceLoading: false,
+          priceError: item.service_id
+            ? "Select a room type to retrieve the price."
+            : "",
         })),
+      })),
     );
 
-    selected.forEach((item) =>
-      resolvePrice(item.categoryId, item.chargeId, item.serviceId),
-    );
+    return;
+  }
 
-    // Only run on room type changes. resolvePrice intentionally uses current
+  // Required services and their room-specific prices are
+  // loaded by autoPopulateIPServices() when room type changes.
+  // Avoid making duplicate price API requests here.
+}, [roomTypeId]);
 
-    // master data and selected room type from this render.
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomTypeId]);
 
   const categorySummaries = useMemo(
     () =>
@@ -866,7 +1034,10 @@ export default function CreateIPBill() {
 
   return (
     <div className="min-h-screen min-w-0 bg-[#F6F6FC] dark:bg-[#11121F]">
-      <FullPageLoader show={isSubmitting} />
+      <FullPageLoader 
+        show={isSubmitting || isLoadingRequiredServices}
+
+       />
 
       <AppSidebar />
 
@@ -1133,7 +1304,15 @@ export default function CreateIPBill() {
 
                     <select
                       value={roomTypeId}
-                      onChange={(event) => setRoomTypeId(event.target.value)}
+                      onChange={(event) => {
+                        const selectedRoomTypeId = event.target.value;
+
+                        setRoomTypeId(selectedRoomTypeId);
+
+                        if (selectedRoomTypeId) {
+                          autoPopulateIPServices(selectedRoomTypeId);
+                        }
+                      }}
                       className={inputClass}
                       required
                     >
