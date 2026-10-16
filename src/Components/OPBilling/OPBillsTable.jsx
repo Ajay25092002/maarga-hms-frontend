@@ -44,6 +44,8 @@ const getTotal = (bill) => Number(bill?.total_amount ?? 0);
 
 const getPaid = (bill) => Number(bill?.amount_paid ?? 0);
 
+const getRefunds = (bill) => Number(bill?.total_refunds ?? bill?.refund_amount ?? 0);
+
 const getOutstanding = (bill) =>
   Number(
     bill?.outstanding_amount ??
@@ -151,7 +153,7 @@ export default function OPBillsTable({
       }`}
     >
       <div className="w-full overflow-x-auto">
-        <Table className="w-full min-w-[1050px] table-auto border-collapse">
+        <Table className="w-full min-w-[1380px] table-auto border-collapse">
           <TableHeader>
             <TableRow
               className={`h-12 border-b hover:bg-transparent ${theme.header}`}
@@ -163,6 +165,9 @@ export default function OPBillsTable({
                 Bill Date
               </TableHead>
               <TableHead className="px-4 text-left text-xs font-semibold">
+                Billed By
+              </TableHead>
+              <TableHead className="px-4 text-left text-xs font-semibold">
                 Patient
               </TableHead>
               <TableHead className="px-4 text-left text-xs font-semibold">
@@ -172,7 +177,13 @@ export default function OPBillsTable({
                 Total Amount
               </TableHead>
               <TableHead className="px-4 text-right text-xs font-semibold">
-                Paid
+                Payments Received
+              </TableHead>
+              <TableHead className="px-4 text-right text-xs font-semibold">
+                Refund Amount
+              </TableHead>
+              <TableHead className="px-4 text-right text-xs font-semibold">
+                Net Paid
               </TableHead>
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Outstanding
@@ -193,7 +204,7 @@ export default function OPBillsTable({
                   key={`bill-skeleton-${index}`}
                   className={`h-[68px] border-b ${theme.row}`}
                 >
-                  {Array.from({ length: 9 }).map((_, cellIndex) => (
+                  {Array.from({ length: 12 }).map((_, cellIndex) => (
                     <TableCell
                       key={`bill-skeleton-cell-${cellIndex}`}
                       className="px-4 py-3"
@@ -211,7 +222,7 @@ export default function OPBillsTable({
               ))
             ) : bills.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-48 px-4 text-center">
+                <TableCell colSpan={12} className="h-48 px-4 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-full ${
@@ -245,6 +256,8 @@ export default function OPBillsTable({
                 const patientId = getPatientId(bill);
                 const total = getTotal(bill);
                 const paid = getPaid(bill);
+                const totalPayments = Number(bill?.total_payments ?? (paid + getRefunds(bill)));
+                const refunds = getRefunds(bill);
                 const outstanding = getOutstanding(bill);
                 const status = getStatus(bill);
 
@@ -279,6 +292,12 @@ export default function OPBillsTable({
                       {formatDate(bill?.bill_date ?? bill?.created_at)}
                     </TableCell>
 
+                    <TableCell className={`max-w-[180px] px-4 py-3 text-xs ${theme.secondaryText}`}>
+                      <span className="block truncate" title={bill?.created_by_name || "Not recorded"}>
+                        {bill?.created_by_name || "Not recorded"}
+                      </span>
+                    </TableCell>
+
                     <TableCell className="max-w-[180px] px-4 py-3">
                       <span
                         title={patientName}
@@ -298,6 +317,18 @@ export default function OPBillsTable({
                       className={`whitespace-nowrap px-4 py-3 text-right text-xs font-medium tabular-nums ${theme.primaryText}`}
                     >
                       {formatCurrency(total)}
+                    </TableCell>
+
+                    <TableCell
+                      className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${theme.primaryText}`}
+                    >
+                      {formatCurrency(totalPayments)}
+                    </TableCell>
+
+                    <TableCell
+                      className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${refunds > 0 ? "text-red-600 dark:text-red-400" : theme.primaryText}`}
+                    >
+                      {formatCurrency(refunds)}
                     </TableCell>
 
                     <TableCell

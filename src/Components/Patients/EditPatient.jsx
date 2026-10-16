@@ -11,6 +11,8 @@ import {
   RotateCcw,
   LoaderCircle,
   AlertCircle,
+  MapPinned,
+  UsersRound,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
@@ -26,6 +28,8 @@ const initialForm = {
   mobile: "",
   email: "",
   address: "",
+  pincode: "",
+  referral: "",
 };
 
 function getErrorMessage(data, fallback) {
@@ -99,6 +103,12 @@ export default function EditPatient() {
 
   const mutedClass = "text-slate-400";
 
+  const textareaClass = `block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
+    isDark
+      ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
+      : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+  }`;
+
   const fetchPatient = useCallback(
     async (signal) => {
       setLoading(true);
@@ -144,6 +154,8 @@ export default function EditPatient() {
           mobile: patient.mobile ?? "",
           email: patient.email ?? "",
           address: patient.address ?? "",
+          pincode: patient.pincode ?? "",
+          referral: patient.referral ?? "",
         });
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -195,6 +207,20 @@ export default function EditPatient() {
     }));
   };
 
+  const updatePincode = (event) => {
+    const value = event.target.value.replace(/\D/g, "").slice(0, 6);
+
+    setForm((current) => ({
+      ...current,
+      pincode: value,
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      pincode: "",
+    }));
+  };
+
   const validate = () => {
     const nextErrors = {};
 
@@ -206,7 +232,7 @@ export default function EditPatient() {
       nextErrors.mobile = "Enter a valid 10-digit Indian mobile number.";
     }
 
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       nextErrors.email = "Enter a valid email address.";
     }
 
@@ -216,6 +242,18 @@ export default function EditPatient() {
       if (Number.isNaN(dob.getTime()) || dob > new Date()) {
         nextErrors.date_of_birth = "Enter a valid date of birth.";
       }
+    }
+
+    if (!form.address.trim()) {
+      nextErrors.address = "Address is required.";
+    }
+
+    if (!/^\d{6}$/.test(form.pincode)) {
+      nextErrors.pincode = "Enter a valid 6-digit pincode.";
+    }
+
+    if (form.referral.trim().length > 255) {
+      nextErrors.referral = "Referral must not exceed 255 characters.";
     }
 
     setErrors(nextErrors);
@@ -235,6 +273,8 @@ export default function EditPatient() {
       mobile: originalPatient.mobile ?? "",
       email: originalPatient.email ?? "",
       address: originalPatient.address ?? "",
+      pincode: originalPatient.pincode ?? "",
+      referral: originalPatient.referral ?? "",
     });
 
     setErrors({});
@@ -256,7 +296,9 @@ export default function EditPatient() {
         gender: form.gender || null,
         mobile: form.mobile.trim(),
         email: form.email.trim() || null,
-        address: form.address.trim() || null,
+        address: form.address.trim(),
+        pincode: form.pincode.trim(),
+        referral: form.referral.trim() || null,
       };
 
       const response = await fetch(
@@ -519,8 +561,39 @@ export default function EditPatient() {
             </div>
           </Field>
 
+          <Field
+            label="Pincode"
+            name="pincode"
+            required
+            error={errors.pincode}
+            labelClass={labelClass}
+          >
+            <div className="relative">
+              <LeadingIcon icon={MapPinned} className={mutedClass} />
+              <input
+                id="pincode"
+                name="pincode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                value={form.pincode}
+                onChange={updatePincode}
+                placeholder="6-digit pincode"
+                maxLength={6}
+                required
+                className={`${inputClass} pl-10`}
+              />
+            </div>
+          </Field>
+
           <div className="min-w-0 md:col-span-2">
-            <Field label="Address" name="address" labelClass={labelClass}>
+            <Field
+              label="Address"
+              name="address"
+              required
+              error={errors.address}
+              labelClass={labelClass}
+            >
               <div className="relative">
                 <MapPin
                   size={16}
@@ -534,15 +607,33 @@ export default function EditPatient() {
                   onChange={updateField}
                   placeholder="House number, street, area, city and state"
                   maxLength={1000}
-                  className={`block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
-                    isDark
-                      ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
-                      : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
-                  }`}
+                  required
+                  className={textareaClass}
                 />
               </div>
             </Field>
           </div>
+
+          <Field
+            label="Referral (Optional)"
+            name="referral"
+            error={errors.referral}
+            labelClass={labelClass}
+          >
+            <div className="relative">
+              <LeadingIcon icon={UsersRound} className={mutedClass} />
+              <input
+                id="referral"
+                name="referral"
+                type="text"
+                value={form.referral}
+                onChange={updateField}
+                placeholder="Referral source or person"
+                maxLength={255}
+                className={`${inputClass} pl-10`}
+              />
+            </div>
+          </Field>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/80 pt-4 dark:border-slate-700">

@@ -339,7 +339,11 @@ export default function IPBillDetails() {
 
   const payments = useMemo(
     () => (Array.isArray(bill?.payments) ? bill.payments : []),
+    [bill],
+  );
 
+  const refunds = useMemo(
+    () => (Array.isArray(bill?.refunds) ? bill.refunds : []),
     [bill],
   );
 
@@ -373,6 +377,10 @@ export default function IPBillDetails() {
   const total = getTotal(bill);
 
   const paid = getPaid(bill);
+
+  const totalRefunds = Number(bill?.total_refunds ?? refunds.reduce((sum, item) => sum + Number(item?.refund_amount ?? 0), 0));
+
+  const totalPayments = Number(bill?.total_payments ?? paid + totalRefunds);
 
   const outstanding = getOutstanding(bill);
 
@@ -502,8 +510,8 @@ export default function IPBillDetails() {
           ]}
         />
 
-        <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
-          <div className="mx-auto w-full max-w-[1200px] space-y-5">
+        <main className="w-full px-4 py-5 sm:px-5 lg:px-6">
+          <div className=" w-full  space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
@@ -724,6 +732,11 @@ export default function IPBillDetails() {
                   border={border}
                 >
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <DetailField
+                      label="Billed By"
+                      value={bill.created_by_name || "Not recorded"}
+                      dark={dark}
+                    />
                     <DetailField
                       label="Admission Date"
                       value={formatDate(bill.admission_date)}
@@ -1109,6 +1122,43 @@ export default function IPBillDetails() {
                               >
                                 {displayValue(payment?.notes)}
                               </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Refund History"
+                  icon={ReceiptText}
+                  dark={dark}
+                  border={border}
+                >
+                  {refunds.length === 0 ? (
+                    <p className={`text-sm ${muted}`}>No refunds have been recorded for this bill.</p>
+                  ) : (
+                    <div className={`overflow-x-auto rounded-md border ${border}`}>
+                      <table className="w-full min-w-[760px] border-collapse text-sm">
+                        <thead className={dark ? "bg-slate-800" : "bg-slate-50"}>
+                          <tr>
+                            {["Refund No.", "Refund Date", "Payment Receipt", "Method", "Reason", "Refund Amount"].map((heading) => (
+                              <th key={heading} className={`border-b px-3 py-3 text-left text-xs font-semibold ${border} ${muted} ${heading === "Refund Amount" ? "text-right" : ""}`}>
+                                {heading}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {refunds.map((refund, index) => (
+                            <tr key={refund?.id ?? `${refund?.refund_number ?? "refund"}-${index}`}>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_number)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{formatDate(refund?.created_at ?? refund?.refund_date, true)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.receipt_number)}</td>
+                              <td className={`border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_method)}</td>
+                              <td className={`max-w-[260px] border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.reason)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 text-right font-medium text-red-600 dark:text-red-400 ${border}`}>{currency(refund?.refund_amount)}</td>
                             </tr>
                           ))}
                         </tbody>

@@ -37,6 +37,10 @@ const GROUPS = [
     keys: ["payments.view", "payments.create"],
   },
   {
+    title: "Payment Refunds",
+    keys: ["refunds.view", "refunds.create"],
+  },
+  {
     title: "Service Groups",
     keys: [
       "service_groups.view",

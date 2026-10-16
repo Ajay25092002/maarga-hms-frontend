@@ -15,7 +15,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 
 const API_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "") + "/api/roles";
+).replace(/\/+$/, "") + "/api/roles";
 
 export default function Roles() {
   const [roles, setRoles] = useState([]);
@@ -36,7 +36,9 @@ export default function Roles() {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.detail || `Unable to load roles (${response.status}).`);
+        throw new Error(
+          data?.detail || `Unable to load roles (${response.status}).`,
+        );
       }
 
       if (!Array.isArray(data)) {
@@ -58,7 +60,7 @@ export default function Roles() {
   const filteredRoles = roles.filter((role) =>
     `${role.name || ""} ${role.description || ""}`
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.toLowerCase()),
   );
 
   const activeCount = roles.filter((role) => role.is_active).length;
@@ -99,13 +101,17 @@ export default function Roles() {
 
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Total Roles</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Total Roles
+              </p>
               <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
                 {roles.length}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Active Roles</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Active Roles
+              </p>
               <p className="mt-2 text-2xl font-semibold text-emerald-600">
                 {activeCount}
               </p>
@@ -115,7 +121,9 @@ export default function Roles() {
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold text-slate-900 dark:text-white">All Roles</h2>
+                <h2 className="font-semibold text-slate-900 dark:text-white">
+                  All Roles
+                </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   View and maintain role configurations.
                 </p>
@@ -164,36 +172,62 @@ export default function Roles() {
                     <th className="px-5 py-3.5 font-medium">Role Name</th>
                     <th className="px-5 py-3.5 font-medium">Description</th>
                     <th className="px-5 py-3.5 font-medium">Status</th>
-                    <th className="px-5 py-3.5 text-right font-medium">Actions</th>
+                    <th className="px-5 py-3.5 text-right font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loading ? (
-                    <tr><td colSpan={4} className="px-5 py-12 text-center text-slate-500">Loading roles...</td></tr>
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-5 py-12 text-center text-slate-500"
+                      >
+                        Loading roles...
+                      </td>
+                    </tr>
                   ) : filteredRoles.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-5 py-12 text-center text-slate-500 dark:text-slate-400">
-                        {error ? "Unable to display roles." : search ? "No matching roles found." : "No roles found. Create your first role."}
+                      <td
+                        colSpan={4}
+                        className="px-5 py-12 text-center text-slate-500 dark:text-slate-400"
+                      >
+                        {error
+                          ? "Unable to display roles."
+                          : search
+                            ? "No matching roles found."
+                            : "No roles found. Create your first role."}
                       </td>
                     </tr>
                   ) : (
                     filteredRoles.map((role) => (
-                      <tr key={role.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                        <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{role.name}</td>
-                        <td className="max-w-sm px-5 py-4 text-slate-600 dark:text-slate-300">{role.description || "—"}</td>
+                      <tr
+                        key={role.id}
+                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+                      >
+                        <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">
+                          {role.name}
+                        </td>
+                        <td className="max-w-sm px-5 py-4 text-slate-600 dark:text-slate-300">
+                          {role.description || "—"}
+                        </td>
                         <td className="px-5 py-4">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${role.is_active ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${role.is_active ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}
+                          >
                             {role.is_active ? "Active" : "Inactive"}
                           </span>
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-2">
-                            <Link to={`/settings/roles/${role.id}`} title="View role" className="rounded-md px-3 border  p-2 text-slate-500 hover:bg-[#F1F0FF] hover:text-[#3E439C] dark:hover:bg-slate-800">
-                              <button type="button" className="  text-sm font-medium">
-                                View
-                              </button>
+                            <Link
+                              to={`/settings/roles/${role.id}`}
+                              title="View role"
+                              className="inline-flex items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#F1F0FF] hover:text-[#3E439C] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                            >
+                              View
                             </Link>
-                    
                           </div>
                         </td>
                       </tr>

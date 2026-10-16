@@ -49,6 +49,7 @@ export default function IPBills() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [billCreators, setBillCreators] = useState([]);
 
   // Query state is owned by the page so the API, not the browser,
   // performs searching, filtering, and pagination.
@@ -58,10 +59,29 @@ export default function IPBills() {
     search: "",
     status: "all",
     date_filter: "all",
+    billed_by: "all",
   });
 
   const text = dark ? "text-slate-100" : "text-slate-800";
   const muted = dark ? "text-slate-400" : "text-slate-500";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/bills/creators`, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load bill creators.");
+        return response.json();
+      })
+      .then((data) => setBillCreators(Array.isArray(data) ? data : []))
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") console.error(requestError);
+      });
+    return () => controller.abort();
+  }, []);
 
   const loadBills = useCallback(
     async (signal) => {
@@ -80,6 +100,9 @@ export default function IPBills() {
         if (query.status !== "all") params.set("status", query.status);
         if (query.date_filter !== "all") {
           params.set("date_filter", query.date_filter);
+        }
+        if (query.billed_by !== "all") {
+          params.set("billed_by", query.billed_by);
         }
 
         const response = await fetch(
@@ -154,7 +177,7 @@ export default function IPBills() {
       // Any search/filter change should start from the first page.
       if (
         Object.keys(changes).some((key) =>
-          ["search", "status", "date_filter", "page_size"].includes(key)
+          ["search", "status", "date_filter", "billed_by", "page_size"].includes(key)
         )
       ) {
         next.page = 1;
@@ -175,6 +198,7 @@ export default function IPBills() {
       search: "",
       status: "all",
       date_filter: "all",
+      billed_by: "all",
     });
   };
 
@@ -202,7 +226,7 @@ export default function IPBills() {
         />
 
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
-          <div className="mx-auto w-full max-w-[1440px]">
+          <div className="mx-auto w-full ">
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
                 <ReceiptText
@@ -226,6 +250,7 @@ export default function IPBills() {
               pagination={pagination}
               summary={summary}
               query={query}
+              billCreators={billCreators}
               loading={loading}
               error={error}
               onQueryChange={handleQueryChange}

@@ -14,6 +14,7 @@ import {
   LogOut,
   AlertCircle,
   Tags,
+  RotateCcw,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
@@ -137,6 +138,15 @@ const groups = [
         permission: "payments.view",
         isActive: (pathname) =>
           pathname === "/payments" || pathname.startsWith("/payments/"),
+      },
+      {
+        label: "Payment Refunds",
+        path: "/payment-refunds",
+        icon: RotateCcw,
+        permission: "refunds.view",
+        isActive: (pathname) =>
+          pathname === "/payment-refunds" ||
+          pathname.startsWith("/payment-refunds/"),
       },
     ],
   },

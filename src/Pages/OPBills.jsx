@@ -38,7 +38,7 @@ export default function OPBills() {
         />
 
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
-          <div className="mx-auto w-full max-w-[1440px]">
+          <div className="mx-auto w-full ">
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
                 <ReceiptText

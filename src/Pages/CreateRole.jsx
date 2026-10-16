@@ -36,6 +36,10 @@ const GROUPS = [
     title: "Payments & Receipts",
     keys: ["payments.view", "payments.create"],
   },
+  {
+    title: "Payment Refunds",
+    keys: ["refunds.view", "refunds.create"],
+  },
 
   // New: Service group management
   {

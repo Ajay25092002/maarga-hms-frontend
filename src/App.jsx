@@ -1,4 +1,3 @@
-
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./Pages/Login";
@@ -35,6 +34,10 @@ import PricingManagement from "./Pages/PricingManagement";
 
 import ProtectedRoute from "./Components/Common/ProtectedRoute";
 import AccessDenied from "./Pages/AccessDenied";
+
+import PaymentRefunds from "./Pages/PaymentRefunds";
+import RecordPaymentRefund from "./Pages/RecordPaymentRefund";
+import RefundDetails from "./Pages/RefundDetails";
 
 export default function App() {
   return (
@@ -183,6 +186,34 @@ export default function App() {
         element={
           <ProtectedRoute permission="pricing.view">
             <PricingManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Payment Refunds */}
+      <Route
+        path="/payment-refunds"
+        element={
+          <ProtectedRoute permission="refunds.view">
+            <PaymentRefunds />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/payment-refunds/new"
+        element={
+          <ProtectedRoute permission="refunds.create">
+            <RecordPaymentRefund />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/payment-refunds/:refundId"
+        element={
+          <ProtectedRoute permission="refunds.view">
+            <RefundDetails />
           </ProtectedRoute>
         }
       />

@@ -60,6 +60,7 @@ export default function IPBillsList({
   pagination = {},
   summary = {},
   query = {},
+  billCreators = [],
   loading = false,
   error = "",
   onQueryChange,
@@ -99,7 +100,8 @@ export default function IPBillsList({
   const hasFilters =
     Boolean(query.search?.trim()) ||
     (query.status ?? "all") !== "all" ||
-    (query.date_filter ?? "all") !== "all";
+    (query.date_filter ?? "all") !== "all" ||
+    (query.billed_by ?? "all") !== "all";
 
   return (
     <div className="min-w-0 space-y-5">
@@ -135,7 +137,7 @@ export default function IPBillsList({
       </section>
 
       <section className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_auto]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_200px_auto]">
           <div className="relative min-w-0">
             <Search
               size={16}
@@ -191,6 +193,28 @@ export default function IPBillsList({
               <option value="today">Today</option>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
+            </select>
+          </div>
+
+          <div className="relative min-w-0">
+            <Filter
+              size={15}
+              className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
+            />
+            <select
+              value={query.billed_by ?? "all"}
+              onChange={(event) =>
+                onQueryChange?.({ billed_by: event.target.value })
+              }
+              className={`${selectClass} w-full pl-9`}
+              aria-label="Filter by billed by username"
+            >
+              <option value="all">All Billed By</option>
+              {billCreators.map((creator) => (
+                <option key={creator.id} value={String(creator.id)}>
+                  {creator.full_name}
+                </option>
+              ))}
             </select>
           </div>
 

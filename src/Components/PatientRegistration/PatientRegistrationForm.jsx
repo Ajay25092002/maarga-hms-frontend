@@ -6,7 +6,10 @@ import {
   MapPin,
   RotateCcw,
   Mail,
+  MapPinned,
+  UsersRound,
 } from "lucide-react";
+
 import { useTheme } from "../../Context/ThemeContext";
 import Loader from "../Common/Loader";
 import { useToast } from "../Common/useToast";
@@ -19,6 +22,8 @@ const initialForm = {
   gender: "",
   email: "",
   address: "",
+  pincode: "",
+  referral: "",
 };
 
 function Field({ label, name, required, error, labelClass, children }) {
@@ -31,7 +36,11 @@ function Field({ label, name, required, error, labelClass, children }) {
 
       {children}
 
-      {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+      {error && (
+        <p className="mt-1.5 text-xs text-red-500" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -62,6 +71,12 @@ export default function PatientRegistrationForm() {
   }`;
 
   const inputClass = `block h-[40px] w-full min-w-0 rounded-md border px-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
+    isDark
+      ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
+      : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+  }`;
+
+  const textareaClass = `block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
     isDark
       ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
       : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
@@ -101,11 +116,29 @@ export default function PatientRegistrationForm() {
     setMessage("");
   };
 
+  const updatePincode = (event) => {
+    const value = event.target.value.replace(/\D/g, "").slice(0, 6);
+
+    setForm((current) => ({
+      ...current,
+      pincode: value,
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      pincode: "",
+    }));
+
+    setMessage("");
+  };
+
   const validate = () => {
     const next = {};
 
     if (!form.fullName.trim()) {
       next.fullName = "Full name is required.";
+    } else if (form.fullName.trim().length < 2) {
+      next.fullName = "Full name must contain at least 2 characters.";
     }
 
     if (!/^[6-9]\d{9}$/.test(form.mobile)) {
@@ -124,8 +157,23 @@ export default function PatientRegistrationForm() {
       next.gender = "Please select a gender.";
     }
 
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (
+      form.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    ) {
       next.email = "Enter a valid email address.";
+    }
+
+    if (!form.address.trim()) {
+      next.address = "Address is required.";
+    }
+
+    if (!/^\d{6}$/.test(form.pincode)) {
+      next.pincode = "Enter a valid 6-digit Indian pincode.";
+    }
+
+    if (form.referral.trim().length > 255) {
+      next.referral = "Referral must not exceed 255 characters.";
     }
 
     setErrors(next);
@@ -159,7 +207,9 @@ export default function PatientRegistrationForm() {
         date_of_birth: form.dateOfBirth || null,
         gender: form.gender,
         email: form.email.trim() || null,
-        address: form.address.trim() || null,
+        address: form.address.trim(),
+        pincode: form.pincode,
+        referral: form.referral.trim() || null,
       };
 
       const response = await fetch(`${API_BASE_URL}/api/patients`, {
@@ -179,7 +229,17 @@ export default function PatientRegistrationForm() {
           typeof detail === "string"
             ? detail
             : Array.isArray(detail)
-              ? detail.map((item) => item.msg).join(", ")
+              ? detail
+                  .map((item) => {
+                    const field = Array.isArray(item.loc)
+                      ? item.loc[item.loc.length - 1]
+                      : null;
+
+                    const message = item.msg || "Invalid value";
+
+                    return field ? `${field}: ${message}` : message;
+                  })
+                  .join(", ")
               : "Unable to register patient. Please try again.";
 
         throw new Error(errorMessage);
@@ -210,9 +270,7 @@ export default function PatientRegistrationForm() {
         duration: 6000,
       });
     } finally {
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 2000);
+      setIsSubmitting(false);
     }
   };
 
@@ -249,6 +307,7 @@ export default function PatientRegistrationForm() {
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2">
+          {/* Full Name */}
           <Field
             label="Full Name"
             name="fullName"
@@ -263,11 +322,12 @@ export default function PatientRegistrationForm() {
               onChange={updateField}
               placeholder="Enter patient's full name"
               autoComplete="name"
-              maxLength={100}
+              maxLength={150}
               className={inputClass}
             />
           </Field>
 
+          {/* Mobile Number */}
           <Field
             label="Mobile Number"
             name="mobile"
@@ -293,6 +353,7 @@ export default function PatientRegistrationForm() {
             </div>
           </Field>
 
+          {/* Date of Birth */}
           <Field
             label="Date of Birth"
             name="dateOfBirth"
@@ -314,6 +375,7 @@ export default function PatientRegistrationForm() {
             </div>
           </Field>
 
+          {/* Gender */}
           <Field
             label="Gender"
             name="gender"
@@ -336,6 +398,7 @@ export default function PatientRegistrationForm() {
             </select>
           </Field>
 
+          {/* Email Address */}
           <Field
             label="Email Address"
             name="email"
@@ -353,16 +416,44 @@ export default function PatientRegistrationForm() {
                 value={form.email}
                 onChange={updateField}
                 placeholder="patient@example.com"
-                maxLength={150}
+                maxLength={255}
                 className={`${inputClass} pl-10`}
               />
             </div>
           </Field>
 
+          {/* Pincode */}
+          <Field
+            label="Pincode"
+            name="pincode"
+            required
+            error={errors.pincode}
+            labelClass={labelClass}
+          >
+            <div className="relative">
+              <LeadingIcon icon={MapPinned} className={mutedClass} />
+
+              <input
+                id="pincode"
+                name="pincode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                value={form.pincode}
+                onChange={updatePincode}
+                placeholder="Enter 6-digit pincode"
+                maxLength={6}
+                className={`${inputClass} pl-10`}
+              />
+            </div>
+          </Field>
+
+          {/* Address */}
           <div className="min-w-0 md:col-span-2">
             <Field
               label="Address"
               name="address"
+              required
               error={errors.address}
               labelClass={labelClass}
             >
@@ -379,12 +470,33 @@ export default function PatientRegistrationForm() {
                   value={form.address}
                   onChange={updateField}
                   placeholder="Enter house number, street, area, city and state"
-                  maxLength={500}
-                  className={`block min-h-[80px] w-full min-w-0 resize-y rounded-md border py-3 pl-10 pr-3 text-sm outline-none transition-colors focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 ${
-                    isDark
-                      ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
-                      : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
-                  }`}
+                  maxLength={1000}
+                  className={textareaClass}
+                />
+              </div>
+            </Field>
+          </div>
+
+          {/* Referral */}
+          <div className="min-w-0 md:col-span-2">
+            <Field
+              label="Referral"
+              name="referral"
+              error={errors.referral}
+              labelClass={labelClass}
+            >
+              <div className="relative">
+                <LeadingIcon icon={UsersRound} className={mutedClass} />
+
+                <input
+                  id="referral"
+                  name="referral"
+                  type="text"
+                  value={form.referral}
+                  onChange={updateField}
+                  placeholder="Enter referral name or source (optional)"
+                  maxLength={255}
+                  className={`${inputClass} pl-10`}
                 />
               </div>
             </Field>
@@ -392,11 +504,14 @@ export default function PatientRegistrationForm() {
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/80 pt-4 dark:border-slate-700">
+         
+
           <div className="ml-auto flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-white disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <RotateCcw size={15} />
               Reset

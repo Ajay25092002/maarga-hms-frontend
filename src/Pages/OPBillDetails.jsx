@@ -257,6 +257,7 @@ export default function OPBillDetails() {
             result?.payments ??
             result?.payment_history ??
             [],
+          refunds: billData.refunds ?? result?.refunds ?? [],
         });
       } catch (err) {
         if (err.name === "AbortError") return;
@@ -289,6 +290,11 @@ export default function OPBillDetails() {
     [bill],
   );
 
+  const refunds = useMemo(
+    () => (Array.isArray(bill?.refunds) ? bill.refunds : []),
+    [bill],
+  );
+
   const subtotal = Number(
     bill?.subtotal ??
       items.reduce(
@@ -310,6 +316,8 @@ export default function OPBillDetails() {
   const billDiscount = Number(bill?.discount_amount ?? 0);
   const total = getTotal(bill);
   const paid = getPaid(bill);
+  const totalRefunds = Number(bill?.total_refunds ?? refunds.reduce((sum, item) => sum + Number(item?.refund_amount ?? 0), 0));
+  const totalPayments = Number(bill?.total_payments ?? paid + totalRefunds);
   const outstanding = getOutstanding(bill);
   const status = getStatus(bill);
 
@@ -434,7 +442,7 @@ export default function OPBillDetails() {
         />
 
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
-          <div className="mx-auto w-full max-w-[1200px] space-y-5">
+          <div className="mx-auto w-full  space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F1F0FF] dark:bg-[#292B49]">
@@ -623,6 +631,11 @@ export default function OPBillDetails() {
                   border={border}
                 >
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <DetailField
+                      label="Billed By"
+                      value={bill.created_by_name || "Not recorded"}
+                      dark={dark}
+                    />
                     <DetailField
                       label="Doctor"
                       value={bill.doctor_name}
@@ -814,8 +827,18 @@ export default function OPBillDetails() {
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm ${muted}`}>Amount Paid</span>
-                    <span className={`text-sm ${text}`}>{currency(paid)}</span>
+                    <span className={`text-sm ${muted}`}>Total Payments Received</span>
+                    <span className={`text-sm ${text}`}>{currency(totalPayments)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <span className={`text-sm ${muted}`}>Total Refunds</span>
+                    <span className="text-sm text-red-600 dark:text-red-400">− {currency(totalRefunds)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <span className={`text-sm font-semibold ${text}`}>Net Payments Retained</span>
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{currency(paid)}</span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
@@ -912,6 +935,43 @@ export default function OPBillDetails() {
                               >
                                 {displayValue(payment?.notes)}
                               </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Refund History"
+                  icon={ReceiptText}
+                  dark={dark}
+                  border={border}
+                >
+                  {refunds.length === 0 ? (
+                    <p className={`text-sm ${muted}`}>No refunds have been recorded for this bill.</p>
+                  ) : (
+                    <div className={`overflow-x-auto rounded-md border ${border}`}>
+                      <table className="w-full min-w-[760px] border-collapse text-sm">
+                        <thead className={dark ? "bg-slate-800" : "bg-slate-50"}>
+                          <tr>
+                            {["Refund No.", "Refund Date", "Payment Receipt", "Method", "Reason", "Refund Amount"].map((heading) => (
+                              <th key={heading} className={`border-b px-3 py-3 text-left text-xs font-semibold ${border} ${muted} ${heading === "Refund Amount" ? "text-right" : ""}`}>
+                                {heading}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {refunds.map((refund, index) => (
+                            <tr key={refund?.id ?? `${refund?.refund_number ?? "refund"}-${index}`}>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_number)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{formatDate(refund?.created_at ?? refund?.refund_date, true)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.receipt_number)}</td>
+                              <td className={`border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_method)}</td>
+                              <td className={`max-w-[260px] border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.reason)}</td>
+                              <td className={`whitespace-nowrap border-b px-3 py-3 text-right font-medium text-red-600 dark:text-red-400 ${border}`}>{currency(refund?.refund_amount)}</td>
                             </tr>
                           ))}
                         </tbody>

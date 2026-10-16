@@ -81,6 +81,8 @@ export default function OPBillsList({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [billedBy, setBilledBy] = useState("all");
+  const [billCreators, setBillCreators] = useState([]);
   const [page, setPage] = useState(1);
 
   // API state
@@ -124,6 +126,24 @@ export default function OPBillsList({
 
   useEffect(() => {
     const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/bills/creators`, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load bill creators.");
+        return response.json();
+      })
+      .then((data) => setBillCreators(Array.isArray(data) ? data : []))
+      .catch((error) => {
+        if (error.name !== "AbortError") console.error(error);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
 
     // Debounce search input to avoid sending a request for
     // every keystroke.
@@ -150,6 +170,9 @@ export default function OPBillsList({
 
         if (dateFilter !== "all") {
           params.set("date_filter", dateFilter);
+        }
+        if (billedBy !== "all") {
+          params.set("billed_by", billedBy);
         }
 
         const url = `${API_BASE_URL}/api/bills?${params.toString()}`;
@@ -246,7 +269,7 @@ export default function OPBillsList({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [page, search, statusFilter, dateFilter, refreshKey]);
+  }, [page, search, statusFilter, dateFilter, billedBy, refreshKey]);
 
   // ==========================================================
   // Filter handlers
@@ -267,10 +290,16 @@ export default function OPBillsList({
     setPage(1);
   }, []);
 
+  const handleBilledBy = useCallback((value) => {
+    setBilledBy(value);
+    setPage(1);
+  }, []);
+
   const resetFilters = () => {
     setSearch("");
     setStatusFilter("all");
     setDateFilter("all");
+    setBilledBy("all");
     setPage(1);
   };
 
@@ -281,7 +310,8 @@ export default function OPBillsList({
   const hasFilters =
     search.trim() !== "" ||
     statusFilter !== "all" ||
-    dateFilter !== "all";
+    dateFilter !== "all" ||
+    billedBy !== "all";
 
   // The API handles pagination. Do not slice bills again here.
   const currentPage = pagination.page || page;
@@ -337,7 +367,7 @@ export default function OPBillsList({
 
       {/* Search and filters */}
       <section className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_auto]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_200px_auto]">
           {/* Search */}
           <div className="relative min-w-0">
             <Search
@@ -400,6 +430,27 @@ export default function OPBillsList({
               <option value="today">Today</option>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
+            </select>
+          </div>
+
+          {/* Billed by filter */}
+          <div className="relative min-w-0">
+            <Filter
+              size={15}
+              className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
+            />
+            <select
+              value={billedBy}
+              onChange={(event) => handleBilledBy(event.target.value)}
+              className={`${selectClass} w-full pl-9`}
+              aria-label="Filter by billed by username"
+            >
+              <option value="all">All Billed By</option>
+              {billCreators.map((creator) => (
+                <option key={creator.id} value={String(creator.id)}>
+                  {creator.full_name}
+                </option>
+              ))}
             </select>
           </div>
 

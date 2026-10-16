@@ -30,6 +30,9 @@ const EMPTY_DATA = {
     patients_registered_today: 0,
     op_bills_today: 0,
     ip_bills_today: 0,
+    total_payments_today: 0,
+    refunds_today: 0,
+    net_collection_today: 0,
     collection_today: 0,
     outstanding_amount: 0,
   },
@@ -110,8 +113,11 @@ function MetricCard({ title, value, subtitle, icon, accent, dark }) {
           >
             {value}
           </p>
-
-
+          {subtitle ? (
+            <p className={`mt-1 text-xs ${dark ? "text-slate-400" : "text-gray-500"}`}>
+              {subtitle}
+            </p>
+          ) : null}
         </div>
 
         <div
@@ -420,7 +426,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <MetricCard
                     title="New Patients Today"
                     value={Number(
@@ -449,10 +455,27 @@ export default function Dashboard() {
                     dark={dark}
                   />
                   <MetricCard
-                    title="Collections Today"
-                    value={currency(summary.collection_today)}
+                    title="Payments Received Today"
+                    value={currency(summary.total_payments_today ?? summary.collection_today)}
+                    subtitle="Before refunds"
                     icon="₹"
                     accent="#16A34A"
+                    dark={dark}
+                  />
+                  <MetricCard
+                    title="Refunds Issued Today"
+                    value={currency(summary.refunds_today)}
+                    subtitle="Returned to patients"
+                    icon="↩"
+                    accent="#DC2626"
+                    dark={dark}
+                  />
+                  <MetricCard
+                    title="Net Collections Today"
+                    value={currency(summary.net_collection_today ?? summary.collection_today)}
+                    subtitle="Payments less refunds"
+                    icon="₹"
+                    accent="#0D9488"
                     dark={dark}
                   />
                   <MetricCard
@@ -466,8 +489,8 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                   <Panel
-                    title="Collection Trend"
-                    subtitle="Payments received over the last 7 days"
+                    title="Net Collection Trend"
+                    subtitle="Payments received less refunds over the last 7 days"
                     className="xl:col-span-2"
                     dark={dark}
                   >
@@ -726,7 +749,7 @@ export default function Dashboard() {
                 >
                   {dashboard.recent_bills.length > 0 ? (
                     <div className="-mx-4 overflow-x-auto sm:mx-0">
-                      <table className="w-full min-w-[950px] border-collapse text-left">
+                      <table className="w-full min-w-[1120px] border-collapse text-left">
                         <thead>
                           <tr
                             className={`border-y ${tableBorder} ${tableHeader}`}
@@ -737,14 +760,16 @@ export default function Dashboard() {
                               "Type",
                               "Date",
                               "Total",
-                              "Paid",
+                              "Payments Received",
+                              "Refunds",
+                              "Net Paid",
                               "Balance",
                               "Status",
                             ].map((heading) => (
                               <th
                                 key={heading}
                                 className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide ${
-                                  ["Total", "Paid", "Balance"].includes(heading)
+                                  ["Total", "Payments Received", "Refunds", "Net Paid", "Balance"].includes(heading)
                                     ? "text-right"
                                     : "text-left"
                                 }`}
@@ -800,6 +825,14 @@ export default function Dashboard() {
                                 className={`whitespace-nowrap px-3 py-3 text-right text-sm font-medium ${pageText}`}
                               >
                                 {currency(bill.total_amount)}
+                              </td>
+
+                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-green-600 dark:text-green-400">
+                                {currency(bill.total_payments ?? bill.amount_paid)}
+                              </td>
+
+                              <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-red-600 dark:text-red-400">
+                                {currency(bill.total_refunds)}
                               </td>
 
                               <td className="whitespace-nowrap px-3 py-3 text-right text-sm text-green-600 dark:text-green-400">

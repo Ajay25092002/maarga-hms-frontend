@@ -88,7 +88,7 @@ export default function ReceiptPreview({
 
       {/* Receipt document */}
       <article
-        className={`receipt-print-area mx-auto w-full max-w-[1200px] space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
+        className={`receipt-print-area mx-auto w-full  space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
       >
         {/* Receipt header */}
         <header
