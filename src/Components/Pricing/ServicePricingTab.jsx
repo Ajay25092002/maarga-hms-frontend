@@ -861,6 +861,7 @@ export default function ServicePricingTab({
                       >
                         ₹
                         {Number(price.amount ?? 0).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
                           minimumFractionDigits: 2,
 
                           maximumFractionDigits: 2,

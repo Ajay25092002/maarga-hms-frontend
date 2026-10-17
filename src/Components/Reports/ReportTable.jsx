@@ -2,8 +2,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 function display(value) {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleString();
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T00:00:00`).toLocaleDateString();
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day, 12).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    });
+  }
   if (typeof value === "number" && /amount|quantity/i.test(String(value))) return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return String(value);
 }
@@ -12,7 +17,7 @@ export default function ReportTable({ items, total, page, pageSize, onPageChange
   const columns = items.length ? Object.keys(items[0]).filter((key) => key !== "report_date") : [];
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-700"><p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Report data</p><p className="text-xs text-slate-500">{total.toLocaleString()} record{total === 1 ? "" : "s"}</p></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-700"><p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Report data</p><p className="text-xs text-slate-500">{total.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} record{total === 1 ? "" : "s"}</p></div>
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-slate-100 text-left text-xs dark:divide-slate-700">
         <thead className="bg-[#F8F8FC] dark:bg-slate-800"><tr>{columns.map((key) => <th key={key} className="whitespace-nowrap px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{key}</th>)}</tr></thead>

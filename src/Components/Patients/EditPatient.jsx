@@ -451,6 +451,7 @@ export default function EditPatient() {
               ? new Date(originalPatient.registered_at).toLocaleString(
                   "en-IN",
                   {
+      timeZone: "Asia/Kolkata",
                     dateStyle: "medium",
                     timeStyle: "short",
                   },
@@ -520,7 +521,7 @@ export default function EditPatient() {
                 name="date_of_birth"
                 type="date"
                 value={form.date_of_birth}
-                max={new Date().toISOString().slice(0, 10)}
+                max={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())}
                 onChange={updateField}
                 className={`${inputClass} pl-10`}
               />

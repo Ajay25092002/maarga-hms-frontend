@@ -25,6 +25,7 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return "—";
 
   return date.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",

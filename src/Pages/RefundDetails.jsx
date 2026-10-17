@@ -39,6 +39,7 @@ function dateTimeText(value) {
   if (Number.isNaN(date.getTime())) return String(value);
 
   return date.toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",

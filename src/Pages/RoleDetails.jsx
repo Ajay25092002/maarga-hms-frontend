@@ -297,7 +297,7 @@ export default function RoleDetails() {
                       </p>
 
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                        {new Date(role.created_at).toLocaleString()}
+                        {new Date(role.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
                       </p>
                     </div>
                   )}
@@ -309,7 +309,7 @@ export default function RoleDetails() {
                       </p>
 
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                        {new Date(role.updated_at).toLocaleString()}
+                        {new Date(role.updated_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
                       </p>
                     </div>
                   )}

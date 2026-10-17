@@ -370,7 +370,7 @@ export default function PatientRegistrationForm() {
                 name="dateOfBirth"
                 type="date"
                 value={form.dateOfBirth}
-                max={new Date().toISOString().slice(0, 10)}
+                max={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())}
                 onChange={updateField}
                 className={`${inputClass} pl-10`}
               />

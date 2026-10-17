@@ -355,7 +355,7 @@ export default function Reports() {
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              Showing {start}–{end} of {total.toLocaleString()}
+              Showing {start}–{end} of {total.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             </div>
           </section>
           <ReportFilters

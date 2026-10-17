@@ -73,6 +73,7 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -86,6 +87,7 @@ const shortDate = (value) => {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
   });

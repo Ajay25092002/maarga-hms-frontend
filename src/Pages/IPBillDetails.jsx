@@ -47,6 +47,7 @@ const formatDate = (value, includeTime = false) => {
   if (Number.isNaN(parsed.getTime())) return "—";
 
   return parsed.toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
     day: "2-digit",
 
     month: "short",
