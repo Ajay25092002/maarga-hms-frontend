@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Tags,
   RotateCcw,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
@@ -148,6 +149,13 @@ const groups = [
           pathname === "/payment-refunds" ||
           pathname.startsWith("/payment-refunds/"),
       },
+      {
+        label: "Reports",
+        path: "/reports",
+        icon: FileSpreadsheet,
+        permission: "reports.view",
+        isActive: (pathname) => pathname === "/reports" || pathname.startsWith("/reports/"),
+      },
     ],
   },
 ];
@@ -256,7 +264,7 @@ function SidebarContents({
   );
 
   const linkClass = (active) =>
-    `group flex min-h-[38px] items-center gap-2.5 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
+    `group flex min-h-[34px] items-center gap-2 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
       active
         ? "bg-[#F1F0FF] text-[#3E439C] dark:bg-[#303253] dark:text-[#DCDFFF]"
         : "text-slate-600 hover:bg-[#F8F7FF] hover:text-[#3E439C] dark:text-slate-300 dark:hover:bg-[#25263A] dark:hover:text-[#DCDFFF]"
@@ -288,7 +296,7 @@ function SidebarContents({
   return (
     <>
       {/* Brand header */}
-      <div className="flex h-[64px] shrink-0 items-center gap-3 border-b border-slate-200 px-3 dark:border-slate-700">
+      <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-slate-200 px-3 dark:border-slate-700">
         <img
           src={logo}
           alt="Hospital HMS"
@@ -308,7 +316,7 @@ function SidebarContents({
       {/* Navigation */}
       <nav
         aria-label="Main navigation"
-        className="billing-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 py-3"
+        className="billing-sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 py-1.5"
       >
         {loadingUser ? (
           <p className="px-3 py-4 text-xs text-slate-500 dark:text-slate-400">
@@ -327,22 +335,22 @@ function SidebarContents({
         ) : (
           <>
             {visibleGroups.map((group) => (
-              <section key={group.title} className="mb-4">
-                <p className="mb-1.5 px-2.5 pt-1 text-[9px] font-semibold tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              <section key={group.title} className="mb-2.5">
+                <p className="mb-3 px-2.5 pt-0.5 text-[9px] font-semibold tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   {group.title}
                 </p>
 
-                <div className="space-y-0.5">{group.items.map(renderItem)}</div>
+                <div className="space-y-1">{group.items.map(renderItem)}</div>
               </section>
             ))}
 
             {visibleSettings.length > 0 && (
-              <section className="mb-3">
-                <p className="mb-1.5 px-2.5 pt-1 text-[9px] font-semibold tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              <section className="mb-2">
+                <p className="mb-1 px-2.5 pt-0.5 text-[9px] font-semibold tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   SETTINGS
                 </p>
 
-                <div className="space-y-0.5">
+                <div className="space-y-0">
                   {visibleSettings.map(renderItem)}
                 </div>
               </section>
@@ -358,7 +366,7 @@ function SidebarContents({
       </nav>
 
       {/* Footer: Logout only */}
-      <footer className="shrink-0 border-t border-slate-200 p-3 dark:border-slate-700">
+      <footer className="shrink-0 border-t border-slate-200 p-2.5 dark:border-slate-700">
         {logoutError && (
           <p
             role="alert"

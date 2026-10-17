@@ -1,5 +1,11 @@
+import {
+  Printer,
+  ArrowLeft,
+  ReceiptText,
+  UserRound,
+  CreditCard,
+} from "lucide-react";
 
-import { Printer, ArrowLeft, ReceiptText, UserRound, CreditCard, CalendarDays } from "lucide-react";
 import {
   formatCurrency,
   formatDate,
@@ -25,6 +31,7 @@ export default function ReceiptPreview({
   const rows = [
     ["Receipt Number", payment.receipt_number || `RCT-${payment.id}`],
     ["Payment Date", formatDate(payment.payment_date, true)],
+    ["Created By", payment.created_by_name || "—"],
     ["Patient Name", getPatientName(payment)],
     ["Patient ID / UHID", patientId],
     ["Bill Number", payment.bill_number || `#${payment.bill_id}`],
@@ -35,8 +42,14 @@ export default function ReceiptPreview({
 
   const billRows = [
     ["Bill Total", formatCurrency(payment.bill_total)],
-    ["Total Paid Against Bill", formatCurrency(payment.bill_amount_paid)],
-    ["Outstanding Balance", formatCurrency(payment.bill_outstanding_amount)],
+    [
+      "Total Paid Against Bill",
+      formatCurrency(payment.bill_amount_paid),
+    ],
+    [
+      "Outstanding Balance",
+      formatCurrency(payment.bill_outstanding_amount),
+    ],
   ];
 
   return (
@@ -88,7 +101,7 @@ export default function ReceiptPreview({
 
       {/* Receipt document */}
       <article
-        className={`receipt-print-area mx-auto w-full  space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
+        className={`receipt-print-area mx-auto w-full space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
       >
         {/* Receipt header */}
         <header
@@ -184,9 +197,7 @@ export default function ReceiptPreview({
               >
                 <span
                   className={`text-sm ${
-                    index === 2
-                      ? `font-semibold ${text}`
-                      : muted
+                    index === 2 ? `font-semibold ${text}` : muted
                   }`}
                 >
                   {label}
@@ -207,9 +218,7 @@ export default function ReceiptPreview({
         </section>
 
         {/* Amount received */}
-        <section
-          className={`rounded-lg border p-4 sm:p-5 ${border}`}
-        >
+        <section className={`rounded-lg border p-4 sm:p-5 ${border}`}>
           <div className="mb-3 flex items-center gap-2">
             <ReceiptText
               size={17}
@@ -261,11 +270,7 @@ export default function ReceiptPreview({
             </p>
           </section>
         )}
-
-   
       </article>
-
-
     </div>
   );
 }

@@ -26,11 +26,11 @@ const GROUPS = [
   },
   {
     title: "OP Bills",
-    keys: ["bills.op.view", "bills.op.create"],
+    keys: ["bills.op.view", "bills.op.create","bills.op.edit"],
   },
   {
     title: "IP Bills",
-    keys: ["bills.ip.view", "bills.ip.create"],
+    keys: ["bills.ip.view", "bills.ip.create","bills.ip.edit"],
   },
   {
     title: "Payments & Receipts",
@@ -86,6 +86,10 @@ const GROUPS = [
     keys: ["doctors.view", "doctors.create", "doctors.edit", "doctors.delete"],
   },
 
+  {
+    title: "Reports",
+    keys: ["reports.view", "reports.download"],
+  },
   {
     title: "Users",
     keys: ["users.view", "users.create", "users.edit", "users.delete"],

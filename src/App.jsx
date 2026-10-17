@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./Pages/Login";
@@ -11,10 +12,12 @@ import EditPatient from "./Pages/EditPatient";
 import OPBills from "./Pages/OPBills";
 import CreateOPBill from "./Pages/CreateOPBill";
 import OPBillDetails from "./Pages/OPBillDetails";
+import EditOPBill from "./Pages/EditOPBill";
 
 import IPBills from "./Pages/IPBills";
 import CreateIPBill from "./Pages/CreateIPBill";
 import IPBillDetails from "./Pages/IPBillDetails";
+import EditIPBill from "./Pages/EditIPBill";
 
 import Payments from "./Pages/Payments";
 import CreatePayment from "./Pages/CreatePayment";
@@ -38,6 +41,7 @@ import AccessDenied from "./Pages/AccessDenied";
 import PaymentRefunds from "./Pages/PaymentRefunds";
 import RecordPaymentRefund from "./Pages/RecordPaymentRefund";
 import RefundDetails from "./Pages/RefundDetails";
+import Reports from "./Pages/Reports";
 
 export default function App() {
   return (
@@ -124,6 +128,15 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/op-billing/:billId/edit"
+        element={
+          <ProtectedRoute permission="bills.op.edit">
+            <EditOPBill />
+          </ProtectedRoute>
+        }
+      />
+
       {/* IP Billing */}
       <Route
         path="/ip-billing"
@@ -148,6 +161,15 @@ export default function App() {
         element={
           <ProtectedRoute permission="bills.ip.view">
             <IPBillDetails />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/ip-billing/:billId/edit"
+        element={
+          <ProtectedRoute permission="bills.ip.edit">
+            <EditIPBill />
           </ProtectedRoute>
         }
       />
@@ -186,6 +208,16 @@ export default function App() {
         element={
           <ProtectedRoute permission="pricing.view">
             <PricingManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Reports */}
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute permission="reports.view">
+            <Reports />
           </ProtectedRoute>
         }
       />

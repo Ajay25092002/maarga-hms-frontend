@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import {
   ArrowLeft,
   CheckCircle2,
@@ -12,29 +14,43 @@ import {
   BedDouble,
   RefreshCw,
 } from "lucide-react";
+
 import AppSidebar from "../Components/Layout/AppSidebar";
+
 import TopNavbar from "../Components/Layout/TopNavbar";
+
 import { useTheme } from "../Context/ThemeContext";
+
 import Loader from "../Components/Common/Loader";
+
 import FullPageLoader from "../Components/Common/FullPageLoader";
+
 import { useToast } from "../Components/Common/useToast";
+
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http\://localhost:8001"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
 const REQUIRED_IP_SERVICES = [
   "NURSING CHARGES",
-  "HOLISTIC THERAPIES",
-  "DIET & FOOD",
-  "PSYCHIATRIC CONSULTATION/TREATMENT",
-  "PSYCHOLOGIST COUNSELLING/TREATMENT",
-  "RECREATION ACTVITIES/THERAPY",
-  "DOCTOR CONSULTATION",
-  "MRD CHARGES",
-  "ADMISSION CHARGES",
 
+  "HOLISTIC THERAPIES",
+
+  "DIET & FOOD",
+
+  "PSYCHIATRIC CONSULTATION/TREATMENT",
+
+  "PSYCHOLOGIST COUNSELLING/TREATMENT",
+
+  "RECREATION ACTVITIES/THERAPY",
+
+  "DOCTOR CONSULTATION",
+
+  "MRD CHARGES",
+
+  "ADMISSION CHARGES",
 ];
 
 const today = () => {
@@ -49,13 +65,23 @@ const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const createCharge = () => ({
   id: makeId(),
+
   service_id: "",
+
+  service_date: today(),
+
   description: "",
+
   quantity: "1",
+
   rate: "",
+
   discount_amount: "0",
+
   gst_amount: "0",
+
   priceLoading: false,
+
   priceError: "",
 });
 
@@ -225,8 +251,9 @@ export default function CreateIPBill() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [savedBill, setSavedBill] = useState(null);
+
   const [isLoadingRequiredServices, setIsLoadingRequiredServices] =
-  useState(false);
+    useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -273,10 +300,15 @@ export default function CreateIPBill() {
 
       const params = new URLSearchParams({
         service_group_id: String(groupId),
+
         bill_type: "IP",
+
         search: search.trim(),
+
         page: "1",
+
         page_size: "10",
+
         is_active: "true",
       });
 
@@ -303,6 +335,7 @@ export default function CreateIPBill() {
 
       return results;
     },
+
     [],
   );
 
@@ -350,7 +383,9 @@ export default function CreateIPBill() {
     try {
       const [groupsData, roomTypesData, doctorsData] = await Promise.all([
         apiRequest("/api/service-groups", { signal }),
+
         apiRequest("/api/room-types", { signal }),
+
         apiRequest("/api/doctors", { signal }),
       ]);
 
@@ -482,6 +517,7 @@ export default function CreateIPBill() {
         description: "",
 
         rate: "",
+
         gst_amount: "0",
 
         priceLoading: false,
@@ -495,9 +531,13 @@ export default function CreateIPBill() {
     if (!roomTypeId) {
       updateCharge(categoryId, chargeId, {
         service_id: serviceId,
+
         rate: "",
+
         gst_amount: "0",
+
         priceLoading: false,
+
         priceError: "Select a room type before choosing a service.",
       });
 
@@ -510,10 +550,15 @@ export default function CreateIPBill() {
 
     updateCharge(categoryId, chargeId, {
       service_id: String(serviceId),
+
       description: getName(service),
+
       rate: "",
+
       gst_amount: "0",
+
       priceLoading: true,
+
       priceError: "",
     });
 
@@ -560,208 +605,246 @@ export default function CreateIPBill() {
     }
   };
 
-  
-const autoPopulateIPServices = async (selectedRoomTypeId) => {
-  if (!selectedRoomTypeId || mastersLoading) return;
+  const autoPopulateIPServices = async (selectedRoomTypeId) => {
+    if (!selectedRoomTypeId || mastersLoading) return;
 
-  setIsLoadingRequiredServices(true);
-  setMastersError("");
+    setIsLoadingRequiredServices(true);
 
-  try {
-    // Step 1: Search for all required services concurrently.
-    const serviceSearchTasks = serviceGroups.flatMap((group) => {
-      const groupId = getId(group);
+    setMastersError("");
 
-      return REQUIRED_IP_SERVICES.map(async (serviceName) => {
-        const params = new URLSearchParams({
-          service_group_id: String(groupId),
-          bill_type: "IP",
-          search: serviceName,
-          page: "1",
-          page_size: "10",
-          is_active: "true",
+    try {
+      // Step 1: Search for all required services concurrently.
+
+      const serviceSearchTasks = serviceGroups.flatMap((group) => {
+        const groupId = getId(group);
+
+        return REQUIRED_IP_SERVICES.map(async (serviceName) => {
+          const params = new URLSearchParams({
+            service_group_id: String(groupId),
+
+            bill_type: "IP",
+
+            search: serviceName,
+
+            page: "1",
+
+            page_size: "10",
+
+            is_active: "true",
+          });
+
+          const data = await apiRequest(`/api/services?${params.toString()}`);
+
+          const matches = unwrapList(data).filter(
+            (service) =>
+              service.is_active !== false &&
+              service.available_for_ip !== false &&
+              getName(service).trim().toUpperCase() === serviceName,
+          );
+
+          return {
+            groupId: String(groupId),
+
+            services: matches,
+          };
+        });
+      });
+
+      // Continue even if an individual service search fails.
+
+      const searchResults = await Promise.allSettled(serviceSearchTasks);
+
+      const fetchedServices = [];
+
+      const servicesByGroup = new Map();
+
+      const searchErrors = [];
+
+      searchResults.forEach((result) => {
+        if (result.status === "rejected") {
+          searchErrors.push(result.reason);
+
+          return;
+        }
+
+        const { groupId, services: matches } = result.value;
+
+        if (!servicesByGroup.has(groupId)) {
+          servicesByGroup.set(groupId, []);
+        }
+
+        const groupServices = servicesByGroup.get(groupId);
+
+        matches.forEach((service) => {
+          const serviceId = String(getId(service));
+
+          // Avoid duplicate services within the same group.
+
+          if (
+            !groupServices.some(
+              (existing) => String(getId(existing)) === serviceId,
+            )
+          ) {
+            groupServices.push(service);
+
+            fetchedServices.push(service);
+          }
+        });
+      });
+
+      if (fetchedServices.length === 0) {
+        throw new Error(
+          searchErrors.length
+            ? "Unable to retrieve the required IP services. Please try again."
+            : "No matching IP services were found for automatic selection.",
+        );
+      }
+
+      // Step 2: Fetch all service prices concurrently.
+
+      const priceResults = await Promise.all(
+        serviceGroups.map(async (group) => {
+          const groupId = String(getId(group));
+
+          const matchedServices = servicesByGroup.get(groupId) || [];
+
+          if (matchedServices.length === 0) return null;
+
+          const items = await Promise.all(
+            matchedServices.map(async (service) => {
+              try {
+                const params = new URLSearchParams({
+                  service_id: String(getId(service)),
+
+                  bill_type: "IP",
+
+                  room_type_id: String(selectedRoomTypeId),
+                });
+
+                const priceData = await apiRequest(
+                  `/api/billing/service-price?${params.toString()}`,
+                );
+
+                return {
+                  ...createCharge(),
+
+                  service_id: String(getId(service)),
+
+                  description: getName(service),
+
+                  rate: String(getPrice(priceData)),
+
+                  quantity: "1",
+
+                  discount_amount: "0",
+
+                  gst_amount: "0",
+
+                  priceLoading: false,
+
+                  priceError: "",
+                };
+              } catch (error) {
+                return {
+                  ...createCharge(),
+
+                  service_id: String(getId(service)),
+
+                  description: getName(service),
+
+                  rate: "",
+
+                  quantity: "1",
+
+                  discount_amount: "0",
+
+                  gst_amount: "0",
+
+                  priceLoading: false,
+
+                  priceError:
+                    error.message ||
+                    "No applicable price exists for this service and room type.",
+                };
+              }
+            }),
+          );
+
+          return {
+            ...createCategory(),
+
+            service_group_id: groupId,
+
+            items,
+          };
+        }),
+      );
+
+      const populatedCategories = priceResults.filter(Boolean);
+
+      // Make fetched services available to the dropdowns.
+
+      setServices((current) => {
+        const byId = new Map(
+          current.map((service) => [String(getId(service)), service]),
+        );
+
+        fetchedServices.forEach((service) => {
+          byId.set(String(getId(service)), service);
         });
 
-        const data = await apiRequest(
-          `/api/services?${params.toString()}`
-        );
-
-        const matches = unwrapList(data).filter(
-          (service) =>
-            service.is_active !== false &&
-            service.available_for_ip !== false &&
-            getName(service).trim().toUpperCase() === serviceName
-        );
-
-        return {
-          groupId: String(groupId),
-          services: matches,
-        };
+        return Array.from(byId.values());
       });
-    });
 
-    // Continue even if an individual service search fails.
-    const searchResults = await Promise.allSettled(serviceSearchTasks);
+      // Update the displayed categories once.
 
-    const fetchedServices = [];
-    const servicesByGroup = new Map();
-    const searchErrors = [];
+      setCategories(populatedCategories);
 
-    searchResults.forEach((result) => {
-      if (result.status === "rejected") {
-        searchErrors.push(result.reason);
-        return;
+      if (searchErrors.length > 0) {
+        setMastersError(
+          "Some service searches failed. Please review the loaded services.",
+        );
       }
-
-      const { groupId, services: matches } = result.value;
-
-      if (!servicesByGroup.has(groupId)) {
-        servicesByGroup.set(groupId, []);
-      }
-
-      const groupServices = servicesByGroup.get(groupId);
-
-      matches.forEach((service) => {
-        const serviceId = String(getId(service));
-
-        // Avoid duplicate services within the same group.
-        if (
-          !groupServices.some(
-            (existing) => String(getId(existing)) === serviceId
-          )
-        ) {
-          groupServices.push(service);
-          fetchedServices.push(service);
-        }
-      });
-    });
-
-    if (fetchedServices.length === 0) {
-      throw new Error(
-        searchErrors.length
-          ? "Unable to retrieve the required IP services. Please try again."
-          : "No matching IP services were found for automatic selection."
-      );
-    }
-
-    // Step 2: Fetch all service prices concurrently.
-    const priceResults = await Promise.all(
-      serviceGroups.map(async (group) => {
-        const groupId = String(getId(group));
-        const matchedServices = servicesByGroup.get(groupId) || [];
-
-        if (matchedServices.length === 0) return null;
-
-        const items = await Promise.all(
-          matchedServices.map(async (service) => {
-            try {
-              const params = new URLSearchParams({
-                service_id: String(getId(service)),
-                bill_type: "IP",
-                room_type_id: String(selectedRoomTypeId),
-              });
-
-              const priceData = await apiRequest(
-                `/api/billing/service-price?${params.toString()}`
-              );
-
-              return {
-                ...createCharge(),
-                service_id: String(getId(service)),
-                description: getName(service),
-                rate: String(getPrice(priceData)),
-                quantity: "1",
-                discount_amount: "0",
-                gst_amount: "0",
-                priceLoading: false,
-                priceError: "",
-              };
-            } catch (error) {
-              return {
-                ...createCharge(),
-                service_id: String(getId(service)),
-                description: getName(service),
-                rate: "",
-                quantity: "1",
-                discount_amount: "0",
-                gst_amount: "0",
-                priceLoading: false,
-                priceError:
-                  error.message ||
-                  "No applicable price exists for this service and room type.",
-              };
-            }
-          })
-        );
-
-        return {
-          ...createCategory(),
-          service_group_id: groupId,
-          items,
-        };
-      })
-    );
-
-    const populatedCategories = priceResults.filter(Boolean);
-
-    // Make fetched services available to the dropdowns.
-    setServices((current) => {
-      const byId = new Map(
-        current.map((service) => [String(getId(service)), service])
-      );
-
-      fetchedServices.forEach((service) => {
-        byId.set(String(getId(service)), service);
-      });
-
-      return Array.from(byId.values());
-    });
-
-    // Update the displayed categories once.
-    setCategories(populatedCategories);
-
-    if (searchErrors.length > 0) {
+    } catch (error) {
       setMastersError(
-        "Some service searches failed. Please review the loaded services."
+        error.message || "Unable to automatically populate IP services.",
       );
+    } finally {
+      setIsLoadingRequiredServices(false);
     }
-  } catch (error) {
-    setMastersError(
-      error.message || "Unable to automatically populate IP services."
-    );
-  } finally {
-    setIsLoadingRequiredServices(false);
-  }
-};
-
+  };
 
   // If the room type changes, every selected service must be repriced.
 
+  useEffect(() => {
+    if (!roomTypeId) {
+      setCategories((current) =>
+        current.map((category) => ({
+          ...category,
 
-useEffect(() => {
-  if (!roomTypeId) {
-    setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) => ({
-          ...item,
-          rate: "",
-          priceLoading: false,
-          priceError: item.service_id
-            ? "Select a room type to retrieve the price."
-            : "",
+          items: category.items.map((item) => ({
+            ...item,
+
+            rate: "",
+
+            priceLoading: false,
+
+            priceError: item.service_id
+              ? "Select a room type to retrieve the price."
+              : "",
+          })),
         })),
-      })),
-    );
+      );
 
-    return;
-  }
+      return;
+    }
 
-  // Required services and their room-specific prices are
-  // loaded by autoPopulateIPServices() when room type changes.
-  // Avoid making duplicate price API requests here.
-}, [roomTypeId]);
+    // Required services and their room-specific prices are
 
+    // loaded by autoPopulateIPServices() when room type changes.
+
+    // Avoid making duplicate price API requests here.
+  }, [roomTypeId]);
 
   const categorySummaries = useMemo(
     () =>
@@ -787,19 +870,28 @@ useEffect(() => {
 
           return {
             id: item.id,
+
             gross,
+
             discount,
+
             gst,
+
             net: Math.max(0, gross - discount),
+
             total: Math.max(0, gross - discount) + gst,
           };
         });
 
         return {
           id: category.id,
+
           subtotal: lines.reduce((sum, line) => sum + line.gross, 0),
+
           discount: lines.reduce((sum, line) => sum + line.discount, 0),
+
           gst: lines.reduce((sum, line) => sum + line.gst, 0),
+
           total: lines.reduce((sum, line) => sum + line.total, 0),
         };
       }),
@@ -822,13 +914,17 @@ useEffect(() => {
 
     const gst = categorySummaries.reduce(
       (sum, category) => sum + category.gst,
+
       0,
     );
 
     return {
       subtotal,
+
       discount,
+
       gst,
+
       total: Math.max(0, subtotal - discount) + gst,
     };
   }, [categorySummaries]);
@@ -947,9 +1043,13 @@ useEffect(() => {
 
           return {
             service_id: Number(item.service_id),
-            service_date: billDate,
+
+            service_date: item.service_date || billDate,
+
             quantity: Number(item.quantity),
+
             discount_amount: Number(item.discount_amount || 0),
+
             gst_amount: gstEligible ? Number(item.gst_amount || 0) : 0,
           };
         }),
@@ -1034,10 +1134,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen min-w-0 bg-[#F6F6FC] dark:bg-[#11121F]">
-      <FullPageLoader 
-        show={isSubmitting || isLoadingRequiredServices}
-
-       />
+      <FullPageLoader show={isSubmitting || isLoadingRequiredServices} />
 
       <AppSidebar />
 
@@ -1218,6 +1315,7 @@ useEffect(() => {
                       {selectedPatient?.patient_id || "Select a patient"}
                     </div>
                   </div>
+
                   <div>
                     <label className={labelClass}>Patient Name</label>
 
@@ -1414,11 +1512,17 @@ useEffect(() => {
 
                                 items: category.items.map((item) => ({
                                   ...item,
+
                                   service_id: "",
+
                                   description: "",
+
                                   rate: "",
+
                                   gst_amount: "0",
+
                                   priceLoading: false,
+
                                   priceError: "",
                                 })),
                               });
@@ -1445,8 +1549,8 @@ useEffect(() => {
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[850px] border-collapse text-sm">
+                      <div className="w-full min-w-0 overflow-hidden">
+                        <table className="w-full min-w-0 table-fixed border-collapse text-sm">
                           <thead>
                             <tr
                               className={
@@ -1454,43 +1558,49 @@ useEffect(() => {
                               }
                             >
                               <th
-                                className={`px-3 py-3 text-left font-medium ${muted}`}
+                                className={`w-32 px-2 py-3 text-left font-medium ${muted}`}
                               >
-                                Service *
+                                Service Date *
                               </th>
 
                               <th
-                                className={`w-24 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-[260px] px-2 py-3 text-left font-medium ${muted}`}
+                              >
+                                Service Name *
+                              </th>
+
+                              <th
+                                className={`w-20 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 Quantity
                               </th>
 
                               <th
-                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 Rate (₹)
                               </th>
 
                               <th
-                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 Amount
                               </th>
 
                               <th
-                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 Discount (₹)
                               </th>
 
                               <th
-                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 GST (₹)
                               </th>
 
                               <th
-                                className={`w-36 px-3 py-3 text-right font-medium ${muted}`}
+                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
                               >
                                 Net Amount
                               </th>
@@ -1520,6 +1630,7 @@ useEffect(() => {
                               const net = Math.max(0, gross - discount);
 
                               const gstEligible = isGstEligible(category, item);
+
                               const gstAmount = gstEligible
                                 ? Math.max(0, Number(item.gst_amount) || 0)
                                 : 0;
@@ -1531,49 +1642,69 @@ useEffect(() => {
                                   key={item.id}
                                   className={`border-t ${border}`}
                                 >
-                                  <td className="px-3 py-3">
-                                    <SearchableDropdown
-                                      value={
-                                        services.find(
-                                          (service) =>
-                                            String(getId(service)) ===
-                                            String(item.service_id),
-                                        ) ?? null
+                                  <td className="min-w-0 px-2 py-3">
+                                    <input
+                                      type="date"
+                                      value={item.service_date || today()}
+                                      onChange={(event) =>
+                                        updateCharge(category.id, item.id, {
+                                          service_date: event.target.value,
+                                        })
                                       }
-                                      onChange={(service) =>
-                                        resolvePrice(
-                                          category.id,
-                                          item.id,
-                                          service ? getId(service) : "",
-                                        )
-                                      }
-                                      fetchOptions={(search, options) =>
-                                        fetchIPServices(
-                                          category.service_group_id,
-                                          search,
-                                          options,
-                                        )
-                                      }
-                                      getOptionLabel={getName}
-                                      getOptionValue={getId}
-                                      placeholder={
-                                        !category.service_group_id
-                                          ? "Select group first"
-                                          : !roomTypeId
-                                            ? "Select room type first"
-                                            : "Select service"
-                                      }
-                                      searchPlaceholder="Search IP services..."
-                                      emptyMessage="No matching IP services found."
-                                      loadingMessage="Searching services..."
-                                      disabled={
-                                        !category.service_group_id ||
-                                        !roomTypeId ||
-                                        item.priceLoading
-                                      }
-                                      minSearchLength={0}
-                                      className="w-full py-0"
+                                      className={`${inputClass} w-full min-w-0`}
+                                      required
                                     />
+                                  </td>
+
+                                  <td className="min-w-0 overflow-hidden px-3 py-3">
+                                    <div className="w-full min-w-0 overflow-hidden">
+                                      <SearchableDropdown
+                                        value={
+                                          services.find(
+                                            (service) =>
+                                              String(getId(service)) ===
+                                              String(item.service_id),
+                                          ) ?? null
+                                        }
+                                        onChange={(service) =>
+                                          resolvePrice(
+                                            category.id,
+
+                                            item.id,
+
+                                            service ? getId(service) : "",
+                                          )
+                                        }
+                                        fetchOptions={(search, options) =>
+                                          fetchIPServices(
+                                            category.service_group_id,
+
+                                            search,
+
+                                            options,
+                                          )
+                                        }
+                                        getOptionLabel={getName}
+                                        getOptionValue={getId}
+                                        placeholder={
+                                          !category.service_group_id
+                                            ? "Select group first"
+                                            : !roomTypeId
+                                              ? "Select room type first"
+                                              : "Select service"
+                                        }
+                                        searchPlaceholder="Search IP services..."
+                                        emptyMessage="No matching IP services found."
+                                        loadingMessage="Searching services..."
+                                        disabled={
+                                          !category.service_group_id ||
+                                          !roomTypeId ||
+                                          item.priceLoading
+                                        }
+                                        minSearchLength={0}
+                                        className="w-full min-w-0 py-0"
+                                      />
+                                    </div>
 
                                     {item.priceLoading && (
                                       <p
@@ -1807,6 +1938,7 @@ useEffect(() => {
 
                     <div className={`flex justify-between text-sm ${muted}`}>
                       <span>Total GST</span>
+
                       <span className={text}>{currency(billSummary.gst)}</span>
                     </div>
 

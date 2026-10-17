@@ -41,6 +41,7 @@ const today = () => {
 const makeItem = () => ({
   id: `${Date.now()}-${Math.random()}`,
   service_id: "",
+  service_date: today(),
   description: "",
   priceLoading: false,
   priceError: "",
@@ -718,7 +719,7 @@ export default function CreateOPBill() {
 
       items: completedItems.map((item) => ({
         service_id: Number(item.service_id),
-        service_date: billDate,
+        service_date: item.service_date || billDate,
         quantity: Number(item.quantity),
         discount_amount: Number(item.discount_amount || 0),
       })),
@@ -1112,13 +1113,13 @@ export default function CreateOPBill() {
 
               {/* Service entries */}
 
+              {/* Services & Charges */}
               <section>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Services & Charges
                     </h2>
-
                     <p className={`mt-1 text-xs ${muted}`}>
                       Select a doctor, then choose an OP service. The applicable
                       rate is loaded automatically.
@@ -1135,8 +1136,21 @@ export default function CreateOPBill() {
                   </button>
                 </div>
 
-                <div className={`overflow-x-auto rounded-md border ${border}`}>
-                  <table className="w-full min-w-[1000px] text-sm">
+                <div
+                  className={`w-full overflow-x-auto rounded-md border ${border}`}
+                >
+                  <table className="w-full min-w-[1100px] table-fixed text-sm">
+                    <colgroup>
+                      <col style={{ width: "15%" }} />
+                      <col style={{ width: "30%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "9%" }} />
+                      <col style={{ width: "11%" }} />
+                      <col style={{ width: "10%" }} />
+                      <col style={{ width: "11%" }} />
+                      <col style={{ width: "7%" }} />
+                    </colgroup>
+
                     <thead
                       className={
                         dark
@@ -1146,30 +1160,27 @@ export default function CreateOPBill() {
                     >
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-semibold">
+                          Service Date
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold">
                           OP Service
                         </th>
-
-                        <th className="w-24 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
                           Quantity
                         </th>
-
-                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
                           Rate (₹)
                         </th>
-
-                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
                           Gross Amount
                         </th>
-
-                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
                           Discount (₹)
                         </th>
-
-                        <th className="w-32 px-3 py-3 text-right text-xs font-semibold">
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
                           Net Amount
                         </th>
-
-                        <th className="w-12 px-2 py-3" />
+                        <th className="px-2 py-3" />
                       </tr>
                     </thead>
 
@@ -1179,46 +1190,69 @@ export default function CreateOPBill() {
 
                         return (
                           <tr key={item.id} className={`border-t ${border}`}>
-                            <td className="px-3 py-2.5">
-                              <SearchableDropdown
-                                value={
-                                  services.find(
-                                    (service) =>
-                                      String(recordId(service)) ===
-                                      String(item.service_id),
-                                  ) ?? null
-                                }
-                                onChange={(service) =>
-                                  resolveServicePrice(
+                            {/* Service Date */}
+                            <td className="px-3 py-2.5 align-middle">
+                              <input
+                                type="date"
+                                value={item.service_date || ""}
+                                onChange={(event) =>
+                                  updateItem(
                                     item.id,
-                                    service ? recordId(service) : "",
-                                    doctorId,
+                                    "service_date",
+                                    event.target.value,
                                   )
                                 }
-                                fetchOptions={fetchOPServices}
-                                getOptionLabel={recordName}
-                                getOptionValue={recordId}
-                                placeholder={
-                                  !doctorId
-                                    ? "Select doctor first"
-                                    : "Select OP service"
-                                }
-                                searchPlaceholder="Search OP services..."
-                                emptyMessage="No matching OP services found."
-                                loadingMessage="Searching OP services..."
-                                disabled={
-                                  !doctorId ||
-                                  mastersLoading ||
-                                  item.priceLoading
-                                }
-                                minSearchLength={0}
-                                className="w-full"
+                                className={`${inputClass} w-full min-w-0`}
+                                aria-label="Service date"
+                                required
                               />
+                            </td>
+
+                            {/* OP Service */}
+                            <td className="px-3 py-2.5 align-middle">
+                              <div className="min-w-0 overflow-hidden">
+                                <SearchableDropdown
+                                  value={
+                                    services.find(
+                                      (service) =>
+                                        String(recordId(service)) ===
+                                        String(item.service_id),
+                                    ) ?? null
+                                  }
+                                  onChange={(service) =>
+                                    resolveServicePrice(
+                                      item.id,
+                                      service ? recordId(service) : "",
+                                      doctorId,
+                                    )
+                                  }
+                                  fetchOptions={fetchOPServices}
+                                  getOptionLabel={recordName}
+                                  getOptionValue={recordId}
+                                  placeholder={
+                                    !doctorId
+                                      ? "Select doctor first"
+                                      : "Select OP service"
+                                  }
+                                  searchPlaceholder="Search OP services..."
+                                  emptyMessage="No matching OP services found."
+                                  loadingMessage="Searching OP services..."
+                                  disabled={
+                                    !doctorId ||
+                                    mastersLoading ||
+                                    item.priceLoading
+                                  }
+                                  minSearchLength={0}
+                                  className="w-full min-w-0"
+                                />
+                              </div>
+
                               {item.priceLoading && (
                                 <p className={`mt-1 text-xs ${muted}`}>
                                   Loading applicable OP price...
                                 </p>
                               )}
+
                               {item.priceError && (
                                 <p className="mt-1 text-xs text-red-500">
                                   {item.priceError}
@@ -1226,7 +1260,8 @@ export default function CreateOPBill() {
                               )}
                             </td>
 
-                            <td className="px-3 py-2.5">
+                            {/* Quantity */}
+                            <td className="px-3 py-2.5 align-middle">
                               <input
                                 type="number"
                                 min="1"
@@ -1235,17 +1270,17 @@ export default function CreateOPBill() {
                                 onChange={(event) =>
                                   updateItem(
                                     item.id,
-
                                     "quantity",
-
                                     event.target.value,
                                   )
                                 }
-                                className={`${inputClass} text-right`}
+                                className={`${inputClass} w-full min-w-0 text-right`}
+                                aria-label={`Quantity for ${item.description || "service"}`}
                               />
                             </td>
 
-                            <td className="px-3 py-2.5">
+                            {/* Rate */}
+                            <td className="px-3 py-2.5 align-middle">
                               <input
                                 type="number"
                                 min="0"
@@ -1257,15 +1292,23 @@ export default function CreateOPBill() {
                                   item.priceLoading ? "Loading..." : "—"
                                 }
                                 title="Rate is populated by the backend and cannot be edited."
-                                className={`${inputClass} text-right ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
+                                className={`${inputClass} w-full min-w-0 text-right ${
+                                  dark ? "bg-slate-800/70" : "bg-slate-50"
+                                }`}
                               />
                             </td>
 
-                            <td className={`px-3 py-2.5 text-right ${muted}`}>
-                              {currency(amount)}
+                            {/* Gross Amount */}
+                            <td
+                              className={`px-3 py-2.5 text-right align-middle ${muted}`}
+                            >
+                              <span className="whitespace-nowrap">
+                                {currency(amount)}
+                              </span>
                             </td>
 
-                            <td className="px-3 py-2.5">
+                            {/* Discount */}
+                            <td className="px-3 py-2.5 align-middle">
                               <input
                                 type="number"
                                 min="0"
@@ -1275,26 +1318,26 @@ export default function CreateOPBill() {
                                 onChange={(event) =>
                                   updateItem(
                                     item.id,
-
                                     "discount_amount",
-
                                     event.target.value,
                                   )
                                 }
-                                className={`${inputClass} text-right`}
-                                aria-label={`Discount for ${
-                                  item.description || "service"
-                                }`}
+                                className={`${inputClass} w-full min-w-0 text-right`}
+                                aria-label={`Discount for ${item.description || "service"}`}
                               />
                             </td>
 
+                            {/* Net Amount */}
                             <td
-                              className={`px-3 py-2.5 text-right font-semibold ${text}`}
+                              className={`px-3 py-2.5 text-right align-middle font-semibold ${text}`}
                             >
-                              {currency(netAmount)}
+                              <span className="whitespace-nowrap">
+                                {currency(netAmount)}
+                              </span>
                             </td>
 
-                            <td className="px-2 py-2.5 text-center">
+                            {/* Remove Service */}
+                            <td className="px-2 py-2.5 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => removeItem(item.id)}

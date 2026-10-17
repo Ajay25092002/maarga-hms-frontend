@@ -1,3 +1,4 @@
+
 import { Search, X } from "lucide-react";
 
 const inputClass = (dark) =>
@@ -12,7 +13,12 @@ export default function PaymentFilters({
   onChange,
   onReset,
   dark,
+  users = [],
 }) {
+  const labelClass = `mb-1 block text-xs font-medium ${
+    dark ? "text-slate-400" : "text-slate-600"
+  }`;
+
   return (
     <div
       className={`rounded-xl border p-4 ${
@@ -21,11 +27,9 @@ export default function PaymentFilters({
           : "border-slate-200 bg-white"
       }`}
     >
-      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
-        {/* Search */}
+      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto]">
         <label className="relative block min-w-0 sm:col-span-2 xl:col-span-1">
           <span className="sr-only">Search payments</span>
-
           <span
             className={`pointer-events-none absolute inset-y-0 left-3 flex items-center ${
               dark ? "text-slate-500" : "text-slate-400"
@@ -33,33 +37,20 @@ export default function PaymentFilters({
           >
             <Search size={17} />
           </span>
-
           <input
             className={`${inputClass(dark)} pl-10`}
             value={filters.search}
-            onChange={(event) =>
-              onChange("search", event.target.value)
-            }
+            onChange={(event) => onChange("search", event.target.value)}
             placeholder="Search patient, bill, receipt or reference"
           />
         </label>
 
-        {/* Bill type */}
         <label className="block min-w-0">
-          <span
-            className={`mb-1 block text-xs font-medium ${
-              dark ? "text-slate-400" : "text-slate-600"
-            }`}
-          >
-            Bill type
-          </span>
-
+          <span className={labelClass}>Bill type</span>
           <select
             className={inputClass(dark)}
             value={filters.bill_type}
-            onChange={(event) =>
-              onChange("bill_type", event.target.value)
-            }
+            onChange={(event) => onChange("bill_type", event.target.value)}
           >
             <option value="">All OP/IP</option>
             <option value="OP">OP</option>
@@ -67,16 +58,8 @@ export default function PaymentFilters({
           </select>
         </label>
 
-        {/* Payment mode */}
         <label className="block min-w-0">
-          <span
-            className={`mb-1 block text-xs font-medium ${
-              dark ? "text-slate-400" : "text-slate-600"
-            }`}
-          >
-            Payment mode
-          </span>
-
+          <span className={labelClass}>Payment mode</span>
           <select
             className={inputClass(dark)}
             value={filters.payment_method}
@@ -93,47 +76,44 @@ export default function PaymentFilters({
           </select>
         </label>
 
-        {/* From date */}
         <label className="block min-w-0">
-          <span
-            className={`mb-1 block text-xs font-medium ${
-              dark ? "text-slate-400" : "text-slate-600"
-            }`}
+          <span className={labelClass}>Collected by</span>
+          <select
+            className={inputClass(dark)}
+            value={filters.created_by}
+            onChange={(event) =>
+              onChange("created_by", event.target.value)
+            }
           >
-            From date
-          </span>
+            <option value="">All staff</option>
+            {users.map((user) => (
+              <option key={user.id} value={String(user.id)}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        </label>
 
+        <label className="block min-w-0">
+          <span className={labelClass}>From date</span>
           <input
             type="date"
             className={inputClass(dark)}
             value={filters.date_from}
-            onChange={(event) =>
-              onChange("date_from", event.target.value)
-            }
+            onChange={(event) => onChange("date_from", event.target.value)}
           />
         </label>
 
-        {/* To date */}
         <label className="block min-w-0">
-          <span
-            className={`mb-1 block text-xs font-medium ${
-              dark ? "text-slate-400" : "text-slate-600"
-            }`}
-          >
-            To date
-          </span>
-
+          <span className={labelClass}>To date</span>
           <input
             type="date"
             className={inputClass(dark)}
             value={filters.date_to}
-            onChange={(event) =>
-              onChange("date_to", event.target.value)
-            }
+            onChange={(event) => onChange("date_to", event.target.value)}
           />
         </label>
 
-        {/* Clear filters — same row on desktop */}
         <div className="flex items-end justify-end sm:col-span-2 xl:col-span-1">
           <button
             type="button"

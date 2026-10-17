@@ -24,6 +24,7 @@ const initialForm = {
   address: "",
   pincode: "",
   referral: "",
+  source_of_lead: "",
 };
 
 function Field({ label, name, required, error, labelClass, children }) {
@@ -210,6 +211,7 @@ export default function PatientRegistrationForm() {
         address: form.address.trim(),
         pincode: form.pincode,
         referral: form.referral.trim() || null,
+        source_of_lead: form.source_of_lead || null,
       };
 
       const response = await fetch(`${API_BASE_URL}/api/patients`, {
@@ -499,6 +501,20 @@ export default function PatientRegistrationForm() {
                   className={`${inputClass} pl-10`}
                 />
               </div>
+            </Field>
+          </div>
+
+          {/* Source of Lead */}
+          <div className="min-w-0 md:col-span-2">
+            <Field label="Source of Lead" name="source_of_lead" error={errors.source_of_lead} labelClass={labelClass}>
+              <select id="source_of_lead" name="source_of_lead" value={form.source_of_lead} onChange={updateField} className={inputClass}>
+                <option value="">Select source of lead (optional)</option>
+                <option value="Word of mouth">Word of mouth</option>
+                <option value="Google">Google</option>
+                <option value="Social media">Social media</option>
+                <option value="Maps">Maps</option>
+                <option value="Advertisement">Advertisement</option>
+              </select>
             </Field>
           </div>
         </div>

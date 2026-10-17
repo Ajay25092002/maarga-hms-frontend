@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   ArrowLeft,
   AlertCircle,
@@ -12,18 +14,23 @@ import {
 } from "lucide-react";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
+
 import TopNavbar from "../Components/Layout/TopNavbar";
+
 import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
-).replace(/\/$/, "");
+).replace(/\/+$/, "");
 
 const currency = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
+
     currency: "INR",
+
     minimumFractionDigits: 2,
+
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 
@@ -36,8 +43,11 @@ const formatDate = (value, includeTime = false) => {
 
   return date.toLocaleString("en-IN", {
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
+
     ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
 };
@@ -101,12 +111,19 @@ const getStatus = (bill) => {
 const getServiceGroupName = (item) => {
   const candidates = [
     item?.service_group_name,
+
     item?.service_group,
+
     item?.group_name,
+
     item?.service_group?.name,
+
     item?.group?.name,
+
     item?.service?.service_group_name,
+
     item?.service?.service_group?.name,
+
     item?.service?.group?.name,
   ];
 
@@ -182,40 +199,58 @@ function SectionCard({ title, icon: Icon, children, dark, border }) {
 
 export default function OPBillDetails() {
   const { billId } = useParams();
+
   const navigate = useNavigate();
+
   const { theme } = useTheme();
+
   const dark = theme === "dark";
 
   const [bill, setBill] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
+
   const [refreshKey, setRefreshKey] = useState(0);
+
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const border = dark ? "border-slate-700" : "border-slate-200";
+
   const text = dark ? "text-slate-100" : "text-slate-800";
+
   const muted = dark ? "text-slate-400" : "text-slate-500";
+
   const surface = dark ? "bg-[#171827]" : "bg-white";
 
   const loadBill = useCallback(
     async (signal) => {
       if (!billId) {
         setError("Bill ID is missing.");
+
         setBill(null);
+
         setLoading(false);
+
         return;
       }
 
       setLoading(true);
+
       setError("");
 
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}`,
+
           {
             method: "GET",
+
             credentials: "include",
+
             headers: { Accept: "application/json" },
+
             signal,
           },
         );
@@ -226,6 +261,7 @@ export default function OPBillDetails() {
           throw new Error(
             getErrorMessage(
               result,
+
               `Unable to load bill (HTTP ${response.status}).`,
             ),
           );
@@ -250,25 +286,31 @@ export default function OPBillDetails() {
 
         setBill({
           ...billData,
+
           items: billData.items ?? result?.items ?? [],
+
           payments:
             billData.payments ??
             billData.payment_history ??
             result?.payments ??
             result?.payment_history ??
             [],
+
           refunds: billData.refunds ?? result?.refunds ?? [],
         });
       } catch (err) {
         if (err.name === "AbortError") return;
 
         console.error("Failed to load OP bill details:", err);
+
         setBill(null);
+
         setError(err.message || "Unable to load bill details.");
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
     },
+
     [billId],
   );
 
@@ -282,16 +324,19 @@ export default function OPBillDetails() {
 
   const items = useMemo(
     () => (Array.isArray(bill?.items) ? bill.items : []),
+
     [bill],
   );
 
   const payments = useMemo(
     () => (Array.isArray(bill?.payments) ? bill.payments : []),
+
     [bill],
   );
 
   const refunds = useMemo(
     () => (Array.isArray(bill?.refunds) ? bill.refunds : []),
+
     [bill],
   );
 
@@ -304,29 +349,43 @@ export default function OPBillDetails() {
             item?.amount ??
               Number(item?.quantity ?? 0) * Number(item?.rate ?? 0),
           ),
+
         0,
       ),
   );
 
   const itemDiscount = items.reduce(
     (sum, item) => sum + Number(item?.discount_amount ?? 0),
+
     0,
   );
 
   const billDiscount = Number(bill?.discount_amount ?? 0);
+
   const total = getTotal(bill);
+
   const paid = getPaid(bill);
-  const totalRefunds = Number(bill?.total_refunds ?? refunds.reduce((sum, item) => sum + Number(item?.refund_amount ?? 0), 0));
-  const totalPayments = Number(bill?.total_payments ?? paid + totalRefunds);
+
+  const totalRefunds = Number(
+    bill?.total_refunds ??
+      refunds.reduce((sum, item) => sum + Number(item?.refund_amount ?? 0), 0),
+  );
+
+  const totalPayments = Number(bill?.total_payments ?? paid);
+
   const outstanding = getOutstanding(bill);
+
   const status = getStatus(bill);
 
   const statusClass = {
     Paid: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+
     "Partially Paid":
       "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+
     Unpaid:
       "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+
     Cancelled:
       "border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
   }[status];
@@ -340,10 +399,12 @@ export default function OPBillDetails() {
       window.alert(
         "Your browser blocked the PDF tab. Allow pop-ups and try again.",
       );
+
       return;
     }
 
     printWindow.document.title = "OP Bill PDF";
+
     printWindow.document.body.innerHTML =
       '<p style="font-family:Arial,sans-serif;padding:24px">Preparing your OP bill PDF...</p>';
 
@@ -352,9 +413,12 @@ export default function OPBillDetails() {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/op-pdf`,
+
         {
           method: "GET",
+
           credentials: "include",
+
           headers: { Accept: "application/pdf" },
         },
       );
@@ -367,10 +431,12 @@ export default function OPBillDetails() {
         if (contentType.includes("application/json")) {
           message = getErrorMessage(
             await response.json().catch(() => null),
+
             message,
           );
         } else {
           const responseText = await response.text().catch(() => "");
+
           if (responseText) message = responseText;
         }
 
@@ -390,11 +456,13 @@ export default function OPBillDetails() {
       }
 
       const pdfUrl = URL.createObjectURL(blob);
+
       printWindow.location.href = pdfUrl;
 
       window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10 * 60 * 1000);
     } catch (err) {
       console.error("Failed to open OP bill PDF:", err);
+
       printWindow.close();
 
       window.alert(
@@ -408,14 +476,23 @@ export default function OPBillDetails() {
   const goBack = () => navigate("/op-billing");
 
   const billNumber = bill?.bill_number ?? bill?.id ?? billId;
+
   const opNumber = bill?.op_number ?? "—";
+
   const patientName = bill ? getPatientName(bill) : "—";
+
   const patientId = bill ? getPatientId(bill) : "—";
+
   const mobile = bill?.mobile ?? bill?.patient?.mobile;
+
   const email = bill?.email ?? bill?.patient?.email;
+
   const address = bill?.address ?? bill?.patient?.address;
+
   const gender = bill?.gender ?? bill?.patient?.gender;
+
   const dateOfBirth = bill?.date_of_birth ?? bill?.patient?.date_of_birth;
+
   const billDate = bill?.bill_date ?? bill?.created_at;
 
   const buttonClass = `inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition ${border} ${text} ${
@@ -435,8 +512,11 @@ export default function OPBillDetails() {
           title="OP Bill Details"
           breadcrumb={[
             "Hospital Management",
+
             "Billing",
+
             "OP Bills",
+
             "Bill Details",
           ]}
         />
@@ -456,6 +536,7 @@ export default function OPBillDetails() {
                   <h1 className={`text-lg font-semibold ${text}`}>
                     OP Bill Details
                   </h1>
+
                   <p className={`mt-1 text-[13px] ${muted}`}>
                     View patient, consultation, charges and payment details
                   </p>
@@ -468,6 +549,17 @@ export default function OPBillDetails() {
                   Back to OP Bills
                 </button>
 
+                {bill?.has_payments === false && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/op-billing/${billId}/edit`)}
+                    disabled={loading || !bill || Boolean(error)}
+                    className="inline-flex h-10 items-center gap-2 rounded-md border border-[#3E439C] px-4 text-sm font-semibold text-[#3E439C] disabled:opacity-60"
+                  >
+                    Edit Bill
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handlePrintPdf}
@@ -479,6 +571,7 @@ export default function OPBillDetails() {
                   ) : (
                     <Printer size={16} />
                   )}
+
                   {pdfLoading ? "Preparing PDF..." : "Print PDF"}
                 </button>
               </div>
@@ -487,8 +580,11 @@ export default function OPBillDetails() {
             {loading ? (
               <div className="space-y-4" aria-live="polite">
                 <div className={`h-28 animate-pulse rounded-lg ${surface}`} />
+
                 <div className={`h-48 animate-pulse rounded-lg ${surface}`} />
+
                 <div className={`h-64 animate-pulse rounded-lg ${surface}`} />
+
                 <p className={`text-sm ${muted}`}>Loading outpatient bill...</p>
               </div>
             ) : error || !bill ? (
@@ -503,6 +599,7 @@ export default function OPBillDetails() {
                     <h2 className={`text-base font-semibold ${text}`}>
                       Unable to load OP Bill
                     </h2>
+
                     <p className={`mt-2 text-sm ${muted}`}>
                       {error || "Bill details are unavailable."}
                     </p>
@@ -534,6 +631,7 @@ export default function OPBillDetails() {
                 className={`space-y-5 rounded-lg border p-4 sm:p-6 ${border} ${surface}`}
               >
                 {/* Bill header */}
+
                 <header
                   className={`flex flex-wrap items-start justify-between gap-4 border-b pb-5 ${border}`}
                 >
@@ -549,15 +647,19 @@ export default function OPBillDetails() {
                       <h2 className={`text-lg font-bold ${text}`}>
                         OUTPATIENT BILL
                       </h2>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         Hospital billing statement
                       </p>
+
                       <p className={`mt-3 text-sm font-semibold ${text}`}>
                         Bill No: {displayValue(billNumber)}
                       </p>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         Patient ID: {displayValue(patientId)}
                       </p>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         OP Number: {displayValue(opNumber)}
                       </p>
@@ -567,6 +669,7 @@ export default function OPBillDetails() {
                   <div className="space-y-2 text-left sm:min-w-[190px] sm:text-right">
                     <div>
                       <p className={`text-xs ${muted}`}>Bill Date</p>
+
                       <p className={`mt-1 text-sm font-medium ${text}`}>
                         {formatDate(billDate)}
                       </p>
@@ -583,6 +686,7 @@ export default function OPBillDetails() {
                 </header>
 
                 {/* Patient Information */}
+
                 <SectionCard
                   title="Patient Information"
                   icon={UserRound}
@@ -595,18 +699,23 @@ export default function OPBillDetails() {
                       value={patientName}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Patient ID / UHID"
                       value={patientId}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Phone Number"
                       value={mobile}
                       dark={dark}
                     />
+
                     <DetailField label="Email" value={email} dark={dark} />
+
                     <DetailField label="Gender" value={gender} dark={dark} />
+
                     <DetailField
                       label="Date of Birth"
                       value={formatDate(dateOfBirth)}
@@ -624,6 +733,7 @@ export default function OPBillDetails() {
                 </SectionCard>
 
                 {/* OP Billing Information uses the same card style */}
+
                 <SectionCard
                   title="Billing Information"
                   icon={CalendarDays}
@@ -636,32 +746,49 @@ export default function OPBillDetails() {
                       value={bill.created_by_name || "Not recorded"}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Doctor"
                       value={bill.doctor_name}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Psychologist"
                       value={bill.psychologist_name}
                       dark={dark}
                     />
-                   
+
                     <DetailField
                       label="Rate Category"
                       value={bill.rate_category || "General OPD"}
+                      dark={dark}
+                    />
+                    <DetailField
+                      label="Last Updated By"
+                      value={bill.updated_by_name ?? "—"}
+                      dark={dark}
+                    />
+                    <DetailField
+                      label="Updated At"
+                      value={formatDate(
+                        bill.updated_at ?? bill.last_updated_at,
+                        true,
+                      )}
                       dark={dark}
                     />
                   </div>
                 </SectionCard>
 
                 {/* Itemized Charges */}
+
                 <section>
                   <div className="mb-3 flex items-center gap-2">
                     <ReceiptText
                       size={17}
                       className="text-[#3E439C] dark:text-[#B9B7FF]"
                     />
+
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Itemized Charges
                     </h2>
@@ -675,13 +802,21 @@ export default function OPBillDetails() {
                         <tr className={dark ? "bg-slate-800" : "bg-slate-50"}>
                           {[
                             "#",
+
                             "Service Group",
+
                             "Description",
+
                             "Service Date",
+
                             "Qty",
+
                             "Rate",
+
                             "Amount",
+
                             "Discount",
+
                             "Net Amount",
                           ].map((heading) => (
                             <th
@@ -689,9 +824,13 @@ export default function OPBillDetails() {
                               className={`border-b px-3 py-3 text-xs font-semibold ${border} ${muted} ${
                                 [
                                   "Qty",
+
                                   "Rate",
+
                                   "Amount",
+
                                   "Discount",
+
                                   "Net Amount",
                                 ].includes(heading)
                                   ? "text-right"
@@ -717,11 +856,15 @@ export default function OPBillDetails() {
                         ) : (
                           items.map((item, index) => {
                             const quantity = Number(item?.quantity ?? 0);
+
                             const rate = Number(item?.rate ?? 0);
+
                             const amount = Number(
                               item?.amount ?? quantity * rate,
                             );
+
                             const discount = Number(item?.discount_amount ?? 0);
+
                             const netAmount = Number(
                               item?.net_amount ??
                                 Math.max(0, amount - discount),
@@ -739,16 +882,19 @@ export default function OPBillDetails() {
                                 >
                                   {index + 1}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 ${border} ${text}`}
                                 >
                                   {getServiceGroupName(item)}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 ${border} ${text}`}
                                 >
                                   {getServiceName(item)}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 whitespace-nowrap ${border} ${text}`}
                                 >
@@ -756,26 +902,31 @@ export default function OPBillDetails() {
                                     item?.service_date ?? bill.bill_date,
                                   )}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 text-right tabular-nums ${border} ${text}`}
                                 >
                                   {quantity}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
                                 >
                                   {currency(rate)}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
                                 >
                                   {currency(amount)}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
                                 >
                                   {currency(discount)}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 text-right whitespace-nowrap font-semibold tabular-nums ${border} ${text}`}
                                 >
@@ -791,9 +942,11 @@ export default function OPBillDetails() {
                 </section>
 
                 {/* Totals: same compact right-aligned list as IP */}
+
                 <section className="ml-auto w-full max-w-sm space-y-3">
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Subtotal</span>
+
                     <span className={`text-sm ${text}`}>
                       {currency(subtotal)}
                     </span>
@@ -802,6 +955,7 @@ export default function OPBillDetails() {
                   {itemDiscount > 0 && (
                     <div className="flex items-center justify-between gap-4">
                       <span className={`text-sm ${muted}`}>Item Discounts</span>
+
                       <span className={`text-sm ${text}`}>
                         {currency(itemDiscount)}
                       </span>
@@ -810,6 +964,7 @@ export default function OPBillDetails() {
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Bill Discount</span>
+
                     <span className={`text-sm ${text}`}>
                       {currency(billDiscount)}
                     </span>
@@ -821,30 +976,45 @@ export default function OPBillDetails() {
                     <span className={`text-sm font-semibold ${text}`}>
                       Final Bill Total
                     </span>
+
                     <span className="text-base font-bold text-[#3E439C] dark:text-[#B9B7FF]">
                       {currency(total)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm ${muted}`}>Total Payments Received</span>
-                    <span className={`text-sm ${text}`}>{currency(totalPayments)}</span>
+                    <span className={`text-sm ${muted}`}>
+                      Total Payments Received
+                    </span>
+
+                    <span className={`text-sm ${text}`}>
+                      {currency(totalPayments)}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Total Refunds</span>
-                    <span className="text-sm text-red-600 dark:text-red-400">− {currency(totalRefunds)}</span>
+
+                    <span className="text-sm text-red-600 dark:text-red-400">
+                      − {currency(totalRefunds)}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm font-semibold ${text}`}>Net Payments Retained</span>
-                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{currency(paid)}</span>
+                    <span className={`text-sm font-semibold ${text}`}>
+                      Net Payments Retained
+                    </span>
+
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      {currency(Math.max(0, totalPayments - totalRefunds))}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm font-semibold ${text}`}>
                       Outstanding Balance
                     </span>
+
                     <span
                       className={`text-sm font-bold ${
                         outstanding > 0 ? "text-amber-600" : "text-emerald-600"
@@ -856,6 +1026,7 @@ export default function OPBillDetails() {
                 </section>
 
                 {/* Payment History: same table design as IP */}
+
                 <SectionCard
                   title="Payment History"
                   icon={CreditCard}
@@ -877,10 +1048,15 @@ export default function OPBillDetails() {
                           <tr>
                             {[
                               "Receipt No.",
+
                               "Payment Date",
+
                               "Method",
+
                               "Reference",
+
                               "Amount",
+
                               "Notes",
                             ].map((heading) => (
                               <th
@@ -910,26 +1086,31 @@ export default function OPBillDetails() {
                               >
                                 {displayValue(payment?.receipt_number)}
                               </td>
+
                               <td
                                 className={`border-b px-3 py-3 whitespace-nowrap ${border} ${text}`}
                               >
                                 {formatDate(payment?.payment_date, true)}
                               </td>
+
                               <td
                                 className={`border-b px-3 py-3 ${border} ${text}`}
                               >
                                 {displayValue(payment?.payment_method)}
                               </td>
+
                               <td
                                 className={`border-b px-3 py-3 ${border} ${text}`}
                               >
                                 {displayValue(payment?.reference_number)}
                               </td>
+
                               <td
                                 className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
                               >
                                 {currency(payment?.amount)}
                               </td>
+
                               <td
                                 className={`border-b px-3 py-3 ${border} ${text}`}
                               >
@@ -950,28 +1131,82 @@ export default function OPBillDetails() {
                   border={border}
                 >
                   {refunds.length === 0 ? (
-                    <p className={`text-sm ${muted}`}>No refunds have been recorded for this bill.</p>
+                    <p className={`text-sm ${muted}`}>
+                      No refunds have been recorded for this bill.
+                    </p>
                   ) : (
-                    <div className={`overflow-x-auto rounded-md border ${border}`}>
+                    <div
+                      className={`overflow-x-auto rounded-md border ${border}`}
+                    >
                       <table className="w-full min-w-[760px] border-collapse text-sm">
-                        <thead className={dark ? "bg-slate-800" : "bg-slate-50"}>
+                        <thead
+                          className={dark ? "bg-slate-800" : "bg-slate-50"}
+                        >
                           <tr>
-                            {["Refund No.", "Refund Date", "Payment Receipt", "Method", "Reason", "Refund Amount"].map((heading) => (
-                              <th key={heading} className={`border-b px-3 py-3 text-left text-xs font-semibold ${border} ${muted} ${heading === "Refund Amount" ? "text-right" : ""}`}>
+                            {[
+                              "Refund No.",
+                              "Refund Date",
+                              "Payment Receipt",
+                              "Method",
+                              "Reason",
+                              "Refund Amount",
+                            ].map((heading) => (
+                              <th
+                                key={heading}
+                                className={`border-b px-3 py-3 text-left text-xs font-semibold ${border} ${muted} ${heading === "Refund Amount" ? "text-right" : ""}`}
+                              >
                                 {heading}
                               </th>
                             ))}
                           </tr>
                         </thead>
+
                         <tbody>
                           {refunds.map((refund, index) => (
-                            <tr key={refund?.id ?? `${refund?.refund_number ?? "refund"}-${index}`}>
-                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_number)}</td>
-                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{formatDate(refund?.created_at ?? refund?.refund_date, true)}</td>
-                              <td className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.receipt_number)}</td>
-                              <td className={`border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.refund_method)}</td>
-                              <td className={`max-w-[260px] border-b px-3 py-3 ${border} ${text}`}>{displayValue(refund?.reason)}</td>
-                              <td className={`whitespace-nowrap border-b px-3 py-3 text-right font-medium text-red-600 dark:text-red-400 ${border}`}>{currency(refund?.refund_amount)}</td>
+                            <tr
+                              key={
+                                refund?.id ??
+                                `${refund?.refund_number ?? "refund"}-${index}`
+                              }
+                            >
+                              <td
+                                className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                              >
+                                {displayValue(refund?.refund_number)}
+                              </td>
+
+                              <td
+                                className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                              >
+                                {formatDate(
+                                  refund?.created_at ?? refund?.refund_date,
+                                  true,
+                                )}
+                              </td>
+
+                              <td
+                                className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                              >
+                                {displayValue(refund?.receipt_number)}
+                              </td>
+
+                              <td
+                                className={`border-b px-3 py-3 ${border} ${text}`}
+                              >
+                                {displayValue(refund?.refund_method)}
+                              </td>
+
+                              <td
+                                className={`max-w-[260px] border-b px-3 py-3 ${border} ${text}`}
+                              >
+                                {displayValue(refund?.reason)}
+                              </td>
+
+                              <td
+                                className={`whitespace-nowrap border-b px-3 py-3 text-right font-medium text-red-600 dark:text-red-400 ${border}`}
+                              >
+                                {currency(refund?.refund_amount)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -985,6 +1220,7 @@ export default function OPBillDetails() {
                     <h2 className={`mb-2 text-sm font-semibold ${text}`}>
                       Bill Notes
                     </h2>
+
                     <p className={`whitespace-pre-wrap text-sm ${muted}`}>
                       {bill.notes}
                     </p>

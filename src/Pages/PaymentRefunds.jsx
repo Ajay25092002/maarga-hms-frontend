@@ -181,7 +181,7 @@ export default function PaymentRefunds() {
         data.total ??
           data.total_count ??
           data.count ??
-          data.pagination?.total ??
+          data.pagination?.total_records ?? data.pagination?.total ??
           rows.length,
       ),
     );
@@ -297,7 +297,7 @@ export default function PaymentRefunds() {
   );
 
   const paymentsWithRefunds = Number(
-    summary.payments_with_refunds ?? summary.unique_payments ?? 0,
+    summary.bills_with_refunds ?? summary.payments_with_refunds ?? summary.unique_payments ?? 0,
   );
 
   return (
@@ -349,7 +349,7 @@ export default function PaymentRefunds() {
                 />
                 <SummaryCard
                   icon={Users}
-                  label="Payments Refunded"
+                  label="Bills Refunded"
                   value={paymentsWithRefunds.toLocaleString("en-IN")}
                   last
                 />
@@ -366,7 +366,7 @@ export default function PaymentRefunds() {
                   type="search"
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Search refund, payment ID or receipt..."
+                  placeholder="Search refund number, bill number, patient or reason..."
                   className={`${inputClass} pl-10`}
                 />
               </div>
@@ -498,7 +498,7 @@ export default function PaymentRefunds() {
                       {[
                         "Refund Number",
                         "Refund Date",
-                        "Payment / Receipt",
+                        "Bill",
                         "Refund Amount",
                         "Method",
                         "Reason",
@@ -592,11 +592,10 @@ export default function PaymentRefunds() {
 
                             <td className="px-3.5 py-4">
                               <p className="whitespace-nowrap text-[13px] font-medium text-[#344054] dark:text-slate-200">
-                                {refund.receipt_number ||
-                                  `Payment #${refund.payment_id ?? "—"}`}
+                                {refund.bill_number || `Bill #${refund.bill_id ?? "—"}`}
                               </p>
                               <p className="mt-0.5 text-[11px] text-[#8A9AB8]">
-                                Payment ID: {refund.payment_id ?? "—"}
+                                {refund.bill_type || "Bill"} · {refund.patient_name || "Patient"}
                               </p>
                             </td>
 

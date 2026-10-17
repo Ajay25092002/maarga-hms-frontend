@@ -310,28 +310,16 @@ export default function RefundDetails() {
                     />
                   </SectionCard>
 
-                  <SectionCard title="Related Payment" icon={Wallet}>
-                    <DetailItem
-                      label="Payment ID"
-                      value={refund.payment_id}
-                    />
-                    <DetailItem
-                      label="Receipt Number"
-                      value={refund.receipt_number}
-                    />
+                  <SectionCard title="Related Bill" icon={Wallet}>
                     <DetailItem label="Bill ID" value={refund.bill_id} />
                     <DetailItem
                       label="Bill Number"
                       value={refund.bill_number}
                     />
-                    <DetailItem
-                      label="Original Payment Amount"
-                      value={
-                        refund.original_payment_amount != null
-                          ? money(refund.original_payment_amount)
-                          : "—"
-                      }
-                    />
+                    <DetailItem label="Original Bill Amount" value={refund.bill_total != null ? money(refund.bill_total) : "—"} />
+                    <DetailItem label="Total Paid" value={refund.total_paid != null ? money(refund.total_paid) : "—"} />
+                    <DetailItem label="Total Refunded" value={refund.total_refunded != null ? money(refund.total_refunded) : "—"} />
+                    <DetailItem label="Outstanding Balance" value={refund.outstanding_amount != null ? money(refund.outstanding_amount) : "—"} />
                   </SectionCard>
 
                   <SectionCard title="Patient Information" icon={UserRound}>

@@ -22,7 +22,7 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 const REFUNDS_API = `${API_BASE_URL}/api/payment-refunds`;
-const PAYMENTS_API = `${API_BASE_URL}/api/payments`;
+const BILLS_API = `${API_BASE_URL}/api/bills`;
 
 const METHODS = ["Cash", "Card", "UPI", "Bank Transfer", "Cheque", "Other"];
 
@@ -113,40 +113,37 @@ function Field({ label, required, children, hint }) {
   );
 }
 
-function normalizePayment(payment) {
+function normalizeBill(bill) {
   return {
-    ...payment,
-    id: payment.id ?? payment.payment_id,
-    receipt_number: payment.receipt_number ?? payment.receipt_no ?? "",
-    patient_name: payment.patient_name ?? payment.name ?? "Unknown patient",
-    mobile: payment.mobile ?? payment.phone ?? "",
-    patient_identifier:
-      payment.patient_identifier ??
-      payment.patient_code ??
-      payment.patient_id ??
-      "",
-    amount: Number(payment.amount ?? payment.payment_amount ?? 0),
-    payment_date: payment.payment_date ?? payment.created_at ?? null,
-    payment_method: payment.payment_method ?? "",
-    bill_number: payment.bill_number ?? "",
+    ...bill,
+    id: bill.id ?? bill.bill_id,
+    bill_number: bill.bill_number ?? `Bill #${bill.id ?? bill.bill_id}`,
+    bill_type: String(bill.bill_type ?? "").toUpperCase(),
+    patient_name: bill.patient_name ?? bill.name ?? "Unknown patient",
+    mobile: bill.mobile ?? bill.patient_mobile ?? "",
+    patient_identifier: bill.patient_id ?? bill.patient_uhid ?? "",
+    total_amount: Number(bill.total_amount ?? bill.bill_total ?? 0),
+    total_paid: Number(bill.total_payments ?? bill.total_paid ?? bill.amount_paid ?? 0),
+    total_refunded: Number(bill.total_refunds ?? bill.total_refunded ?? 0),
+    outstanding_amount: Number(bill.outstanding_amount ?? 0),
+    bill_date: bill.bill_date ?? bill.created_at ?? null,
   };
 }
 
-function getPaymentResults(data) {
+function getBillResults(data) {
   const results = Array.isArray(data)
     ? data
-    : (data?.items ?? data?.results ?? data?.payments ?? data?.data ?? []);
-
+    : (data?.items ?? data?.results ?? data?.bills ?? data?.data ?? []);
   return Array.isArray(results)
-    ? results.map(normalizePayment).filter((payment) => payment.id != null)
+    ? results.map(normalizeBill).filter((bill) => bill.id != null && bill.total_amount > 0 && bill.total_paid >= bill.total_amount && bill.total_refunded <= 0)
     : [];
 }
 
-function PaymentSearchDropdown({
+function BillSearchDropdown({
   value,
   onSelect,
   onClear,
-  selectedPayment,
+  selectedBill,
   disabled,
   dark,
 }) {
@@ -194,21 +191,22 @@ function PaymentSearchDropdown({
       try {
         const params = new URLSearchParams({
           search: term,
+          status: "Paid",
           page: "1",
-          page_size: "10",
+          page_size: "100",
         });
 
-        const data = await apiRequest(`${PAYMENTS_API}?${params}`);
+        const data = await apiRequest(`${BILLS_API}?${params}`);
 
         if (!cancelled) {
-          setResults(getPaymentResults(data));
+          setResults(getBillResults(data));
         }
       } catch (err) {
         if (!cancelled) {
           setResults([]);
           setSearchError(
             err.message ||
-              "Unable to search payments. Check the payments API endpoint.",
+              "Unable to search bills. Check the bills API endpoint.",
           );
         }
       } finally {
@@ -222,8 +220,8 @@ function PaymentSearchDropdown({
     };
   }, [query, open]);
 
-  const handleSelect = (payment) => {
-    onSelect(payment);
+  const handleSelect = (bill) => {
+    onSelect(bill);
     setQuery("");
     setResults([]);
     setOpen(false);
@@ -232,7 +230,7 @@ function PaymentSearchDropdown({
 
   return (
     <div ref={containerRef} className="relative">
-      {selectedPayment ? (
+      {selectedBill ? (
         <div
           className={`rounded-md border p-3 ${
             dark
@@ -243,34 +241,27 @@ function PaymentSearchDropdown({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-[#3E439C] dark:text-[#D6D4FF]">
-                Payment #{selectedPayment.id}
-                {selectedPayment.receipt_number &&
-                  ` · ${selectedPayment.receipt_number}`}
+                Bill: {selectedBill.bill_number}
               </p>
 
               <p className="mt-1 truncate text-[13px] font-medium text-[#101828] dark:text-slate-100">
-                {selectedPayment.patient_name}
+                {selectedBill.patient_name}
               </p>
 
               <p className="mt-1 text-xs text-[#667085] dark:text-slate-400">
-                {selectedPayment.mobile || "No mobile number"}
-                {selectedPayment.patient_identifier
-                  ? ` · Patient ID: ${selectedPayment.patient_identifier}`
+                {selectedBill.mobile || "No mobile number"}
+                {selectedBill.patient_identifier
+                  ? ` · Patient ID: ${selectedBill.patient_identifier}`
                   : ""}
               </p>
 
               <p className="mt-1 text-xs text-[#667085] dark:text-slate-400">
-                {selectedPayment.bill_number
-                  ? `Bill: ${selectedPayment.bill_number} · `
-                  : ""}
-                {formatDate(selectedPayment.payment_date)}
-                {selectedPayment.payment_method
-                  ? ` · ${selectedPayment.payment_method}`
-                  : ""}
+                {selectedBill.bill_type ? `${selectedBill.bill_type} · ` : ""}
+                {formatDate(selectedBill.bill_date)}
               </p>
 
               <p className="mt-2 text-[13px] font-semibold text-[#101828] dark:text-slate-100">
-                Payment amount: {money(selectedPayment.amount)}
+                Bill amount: {money(selectedBill.total_amount)}
               </p>
             </div>
 
@@ -278,7 +269,7 @@ function PaymentSearchDropdown({
               type="button"
               disabled={disabled}
               onClick={onClear}
-              aria-label="Change selected payment"
+              aria-label="Change selected bill"
               className="rounded-md p-1.5 text-[#667085] hover:bg-[#ECEBFA] hover:text-[#3E439C] disabled:opacity-50 dark:hover:bg-[#292B49]"
             >
               <X size={17} />
@@ -305,11 +296,11 @@ function PaymentSearchDropdown({
               onKeyDown={(event) => {
                 if (event.key === "Escape") setOpen(false);
               }}
-              placeholder="Search payment ID, receipt, patient name or mobile"
+              placeholder="Search bill number, patient name, patient ID or mobile"
               className={`${inputClass} pl-9 pr-9`}
               autoComplete="off"
               aria-expanded={open}
-              aria-label="Search payments"
+              aria-label="Search bills"
             />
 
             <ChevronDown
@@ -322,12 +313,12 @@ function PaymentSearchDropdown({
             <div className="absolute z-30 mt-1.5 max-h-[320px] w-full overflow-y-auto rounded-md border border-[#DFE4F2] bg-white shadow-lg dark:border-[#34364F] dark:bg-[#1B1C2B]">
               {query.trim().length < 2 ? (
                 <p className="px-3.5 py-3 text-[13px] text-[#667085] dark:text-slate-400">
-                  Type at least 2 characters to search payments.
+                  Type at least 2 characters to search bills.
                 </p>
               ) : loading ? (
                 <div className="flex items-center gap-2 px-3.5 py-4 text-[13px] text-[#667085] dark:text-slate-400">
                   <LoaderCircle size={16} className="animate-spin" />
-                  Searching payments...
+                  Searching bills...
                 </div>
               ) : searchError ? (
                 <div className="px-3.5 py-3 text-[13px] text-red-600 dark:text-red-400">
@@ -335,46 +326,38 @@ function PaymentSearchDropdown({
                 </div>
               ) : results.length === 0 ? (
                 <p className="px-3.5 py-3 text-[13px] text-[#667085] dark:text-slate-400">
-                  No matching payments found.
+                  No matching bills found.
                 </p>
               ) : (
-                results.map((payment) => (
+                results.map((bill) => (
                   <button
-                    key={payment.id}
+                    key={bill.id}
                     type="button"
-                    onClick={() => handleSelect(payment)}
+                    onClick={() => handleSelect(bill)}
                     className="block w-full border-b border-[#EEF0F6] px-3.5 py-3 text-left last:border-b-0 hover:bg-[#F1F0FF] dark:border-[#34364F] dark:hover:bg-[#292B49]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold text-[#3E439C] dark:text-[#D6D4FF]">
-                          Payment #{payment.id}
-                          {payment.receipt_number
-                            ? ` · ${payment.receipt_number}`
-                            : ""}
+                          {bill.bill_number} · {bill.bill_type}
                         </p>
 
                         <p className="mt-1 truncate text-[13px] font-medium text-[#101828] dark:text-slate-100">
-                          {payment.patient_name}
+                          {bill.patient_name}
                         </p>
 
                         <p className="mt-1 text-xs text-[#667085] dark:text-slate-400">
-                          {payment.mobile || "No mobile number"}
-                          {payment.patient_identifier
-                            ? ` · Patient ID: ${payment.patient_identifier}`
-                            : ""}
+                          {bill.mobile || "No mobile number"}
+                          {bill.patient_identifier ? ` · Patient ID: ${bill.patient_identifier}` : ""}
                         </p>
 
                         <p className="mt-1 text-xs text-[#667085] dark:text-slate-400">
-                          {formatDate(payment.payment_date)}
-                          {payment.payment_method
-                            ? ` · ${payment.payment_method}`
-                            : ""}
+                          {formatDate(bill.bill_date)}
                         </p>
                       </div>
 
                       <p className="shrink-0 text-[13px] font-semibold text-[#101828] dark:text-slate-100">
-                        {money(payment.amount)}
+                        {money(bill.total_amount)}
                       </p>
                     </div>
                   </button>
@@ -385,7 +368,7 @@ function PaymentSearchDropdown({
         </>
       )}
 
-      <input type="hidden" name="payment_id" value={value || ""} />
+      <input type="hidden" name="bill_id" value={value || ""} />
     </div>
   );
 }
@@ -399,14 +382,14 @@ export default function RecordPaymentRefund() {
   const muted = dark ? "text-slate-400" : "text-slate-500";
 
   const [form, setForm] = useState({
-    payment_id: "",
+    bill_id: "",
     refund_amount: "",
     refund_method: "Cash",
     reason: "",
     notes: "",
   });
 
-  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [selectedBill, setSelectedBill] = useState(null);
   const [balance, setBalance] = useState(null);
   const [checkingBalance, setCheckingBalance] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -419,11 +402,11 @@ export default function RecordPaymentRefund() {
     setSuccess("");
   };
 
-  const selectPayment = async (payment) => {
-    setSelectedPayment(payment);
+  const selectBill = async (bill) => {
+    setSelectedBill(bill);
     setForm((current) => ({
       ...current,
-      payment_id: String(payment.id),
+      bill_id: String(bill.id),
       refund_amount: "",
     }));
     setBalance(null);
@@ -434,48 +417,39 @@ export default function RecordPaymentRefund() {
 
     try {
       const data = await apiRequest(
-        `${REFUNDS_API}/payments/${encodeURIComponent(payment.id)}/balance`,
+        `${REFUNDS_API}/bills/${encodeURIComponent(bill.id)}/balance`,
       );
 
-      const result = data?.balance ?? data?.payment ?? data;
+      const result = data?.balance ?? data?.bill ?? data;
 
       const nextBalance = {
-        payment_amount: Number(
-          result.payment_amount ??
-            result.amount ??
-            result.original_amount ??
-            payment.amount ??
-            0,
-        ),
+        bill_total: Number(result.bill_total ?? result.total_amount ?? bill.total_amount ?? 0),
+        total_paid: Number(result.total_paid ?? bill.total_paid ?? 0),
+        outstanding_amount: Number(result.outstanding_amount ?? bill.outstanding_amount ?? 0),
         total_refunded: Number(
           result.total_refunded ?? result.refunded_amount ?? 0,
         ),
-        refundable_balance: Number(
-          result.refundable_balance ??
-            result.remaining_balance ??
-            result.balance ??
-            0,
-        ),
+        refundable_balance: Number(result.refundable_balance ?? result.remaining_balance ?? result.balance ?? 0),
       };
 
       setBalance(nextBalance);
 
       if (nextBalance.refundable_balance <= 0) {
-        setError("This payment has no remaining refundable balance.");
+        setError("This bill has no remaining refundable amount.");
       }
     } catch (err) {
-      setError(err.message || "Unable to retrieve payment balance.");
+      setError(err.message || "Unable to retrieve bill refund balance.");
     } finally {
       setCheckingBalance(false);
     }
   };
 
-  const clearSelectedPayment = () => {
-    setSelectedPayment(null);
+  const clearSelectedBill = () => {
+    setSelectedBill(null);
     setBalance(null);
     setForm((current) => ({
       ...current,
-      payment_id: "",
+      bill_id: "",
       refund_amount: "",
     }));
     setError("");
@@ -487,21 +461,21 @@ export default function RecordPaymentRefund() {
     setError("");
     setSuccess("");
 
-    const paymentId = Number(form.payment_id);
+    const billId = Number(form.bill_id);
     const amount = Number(form.refund_amount);
 
-    if (!selectedPayment || !Number.isInteger(paymentId) || paymentId <= 0) {
-      setError("Search for and select a payment first.");
+    if (!selectedBill || !Number.isInteger(billId) || billId <= 0) {
+      setError("Search for and select a bill first.");
       return;
     }
 
     if (!balance) {
-      setError("The selected payment balance has not been verified.");
+      setError("The selected bill refund balance has not been verified.");
       return;
     }
 
     if (balance.refundable_balance <= 0) {
-      setError("This payment has no remaining refundable balance.");
+      setError("This bill has no remaining refundable amount.");
       return;
     }
 
@@ -528,7 +502,7 @@ export default function RecordPaymentRefund() {
       await apiRequest(REFUNDS_API, {
         method: "POST",
         body: JSON.stringify({
-          payment_id: paymentId,
+          bill_id: billId,
           refund_amount: amount,
           refund_method: form.refund_method,
           reason: form.reason.trim(),
@@ -580,7 +554,7 @@ export default function RecordPaymentRefund() {
                   Record Payment Refund
                 </h1>
                 <p className={`mt-1 text-[13px] ${muted}`}>
-                  Select an existing payment and record its refund
+                  Select a bill and record a refund against that bill
                 </p>
               </div>
             </div>
@@ -603,8 +577,7 @@ export default function RecordPaymentRefund() {
                   Refund Information
                 </h2>
                 <p className={`mt-1 text-[13px] ${muted}`}>
-                  Select the original payment before entering the refund
-                  details.
+                  Only fully paid bills with a remaining refundable amount can be selected.
                 </p>
               </div>
 
@@ -624,15 +597,15 @@ export default function RecordPaymentRefund() {
                 )}
 
                 <Field
-                  label="Select Payment"
+                  label="Select Bill"
                   required
-                  hint="Search by payment ID, receipt number, patient name or mobile number."
+                  hint="Search by bill number, patient name, patient ID or mobile number."
                 >
-                  <PaymentSearchDropdown
-                    value={form.payment_id}
-                    selectedPayment={selectedPayment}
-                    onSelect={selectPayment}
-                    onClear={clearSelectedPayment}
+                  <BillSearchDropdown
+                    value={form.bill_id}
+                    selectedBill={selectedBill}
+                    onSelect={selectBill}
+                    onClear={clearSelectedBill}
                     disabled={saving || checkingBalance}
                     dark={dark}
                   />
@@ -641,7 +614,7 @@ export default function RecordPaymentRefund() {
                 {checkingBalance && (
                   <div className="flex items-center gap-2 text-[13px] text-[#667085] dark:text-slate-400">
                     <LoaderCircle size={16} className="animate-spin" />
-                    Loading payment balance...
+                    Loading bill refund balance...
                   </div>
                 )}
 
@@ -653,18 +626,23 @@ export default function RecordPaymentRefund() {
                         className="text-[#3E439C] dark:text-[#D6D4FF]"
                       />
                       <h3 className={`text-[13px] font-semibold ${text}`}>
-                        Payment Balance
+                        Bill Refund Summary
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                       <div>
-                        <p className={`text-xs ${muted}`}>Original Payment</p>
-                        <p className={`mt-1 text-sm font-semibold ${text}`}>
-                          {money(balance.payment_amount)}
-                        </p>
+                        <p className={`text-xs ${muted}`}>Original Bill Amount</p>
+                        <p className={`mt-1 text-sm font-semibold ${text}`}>{money(balance.bill_total)}</p>
                       </div>
-
+                      <div>
+                        <p className={`text-xs ${muted}`}>Total Paid</p>
+                        <p className={`mt-1 text-sm font-semibold ${text}`}>{money(balance.total_paid)}</p>
+                      </div>
+                      <div>
+                        <p className={`text-xs ${muted}`}>Outstanding</p>
+                        <p className={`mt-1 text-sm font-semibold ${text}`}>{money(balance.outstanding_amount)}</p>
+                      </div>
                       <div>
                         <p className={`text-xs ${muted}`}>Already Refunded</p>
                         <p className={`mt-1 text-sm font-semibold ${text}`}>
@@ -781,7 +759,7 @@ export default function RecordPaymentRefund() {
                   disabled={
                     saving ||
                     checkingBalance ||
-                    !selectedPayment ||
+                    !selectedBill ||
                     !balance ||
                     balance.refundable_balance <= 0
                   }

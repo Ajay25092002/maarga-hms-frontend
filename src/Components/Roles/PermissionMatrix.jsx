@@ -1,4 +1,3 @@
-
 import React from "react";
 
 const GROUPS = [
@@ -9,6 +8,7 @@ const GROUPS = [
   { title: "IP Billing", prefix: "bills.ip." },
   { title: "Payments & Receipts", prefix: "payments." },
   { title: "Payment Refunds", prefix: "refunds." },
+  { title: "Reports", prefix: "reports." },
   { title: "Users", prefix: "users." },
   { title: "Roles", prefix: "roles." },
 ];
@@ -24,8 +24,7 @@ const actionLabels = {
 const humanize = (key) => {
   const action = key.split(".").pop();
   return (
-    actionLabels[action] ||
-    action.charAt(0).toUpperCase() + action.slice(1)
+    actionLabels[action] || action.charAt(0).toUpperCase() + action.slice(1)
   );
 };
 
@@ -39,16 +38,12 @@ export default function PermissionMatrix({
     .map((item) => (typeof item === "string" ? item : item?.key))
     .filter(Boolean);
 
-  const groups = GROUPS
-    .map((group) => ({
-      ...group,
-      permissions: keys.filter((key) => key.startsWith(group.prefix)),
-    }))
-    .filter((group) => group.permissions.length);
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    permissions: keys.filter((key) => key.startsWith(group.prefix)),
+  })).filter((group) => group.permissions.length);
 
-  const groupedKeys = new Set(
-    groups.flatMap((group) => group.permissions)
-  );
+  const groupedKeys = new Set(groups.flatMap((group) => group.permissions));
 
   const otherKeys = keys.filter((key) => !groupedKeys.has(key));
 
@@ -82,8 +77,8 @@ export default function PermissionMatrix({
         </div>
 
         <span className="w-fit rounded-full bg-[#F1F0FF] px-3 py-1.5 text-xs font-bold text-[#3E439C]">
-          {keys.filter((key) => Boolean(value[key])).length} of{" "}
-          {keys.length} selected
+          {keys.filter((key) => Boolean(value[key])).length} of {keys.length}{" "}
+          selected
         </span>
       </div>
 
@@ -95,7 +90,7 @@ export default function PermissionMatrix({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {groups.map((group) => {
             const selected = group.permissions.filter((key) =>
-              Boolean(value[key])
+              Boolean(value[key]),
             ).length;
 
             return (
@@ -118,9 +113,7 @@ export default function PermissionMatrix({
                       <button
                         type="button"
                         className="text-xs font-bold text-[#3E439C] hover:underline"
-                        onClick={() =>
-                          toggleGroup(group.permissions, true)
-                        }
+                        onClick={() => toggleGroup(group.permissions, true)}
                       >
                         Select all
                       </button>
@@ -128,9 +121,7 @@ export default function PermissionMatrix({
                       <button
                         type="button"
                         className="text-xs font-bold text-slate-500 hover:underline"
-                        onClick={() =>
-                          toggleGroup(group.permissions, false)
-                        }
+                        onClick={() => toggleGroup(group.permissions, false)}
                       >
                         Clear
                       </button>
@@ -143,9 +134,7 @@ export default function PermissionMatrix({
                     <label
                       key={key}
                       className={`flex min-h-11 items-center gap-3 border-b border-slate-100 last:border-0 ${
-                        readOnly
-                          ? "cursor-default"
-                          : "cursor-pointer"
+                        readOnly ? "cursor-default" : "cursor-pointer"
                       }`}
                     >
                       <input

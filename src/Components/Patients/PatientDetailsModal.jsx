@@ -374,6 +374,12 @@ const PatientDetailsModal = ({
               value={gender}
               dark={dark}
             />
+
+            <InfoField
+              label="Source of Lead"
+              value={patient.source_of_lead}
+              dark={dark}
+            />
           </DetailSection>
 
           <DetailSection

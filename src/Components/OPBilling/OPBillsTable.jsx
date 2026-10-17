@@ -256,7 +256,7 @@ export default function OPBillsTable({
                 const patientId = getPatientId(bill);
                 const total = getTotal(bill);
                 const paid = getPaid(bill);
-                const totalPayments = Number(bill?.total_payments ?? (paid + getRefunds(bill)));
+                const totalPayments = Number(bill?.total_payments ?? paid);
                 const refunds = getRefunds(bill);
                 const outstanding = getOutstanding(bill);
                 const status = getStatus(bill);
@@ -334,7 +334,7 @@ export default function OPBillsTable({
                     <TableCell
                       className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${theme.primaryText}`}
                     >
-                      {formatCurrency(paid)}
+                      {formatCurrency(Math.max(0, totalPayments - refunds))}
                     </TableCell>
 
                     <TableCell
@@ -350,7 +350,14 @@ export default function OPBillsTable({
                     </TableCell>
 
                     <TableCell className="px-4 py-3">
-                      <StatusBadge status={status} dark={dark} />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={status} dark={dark} />
+                        {bill?.refund_status && bill.refund_status !== "Not Refunded" && (
+                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-300">
+                            {bill.refund_status}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
 
                     <TableCell className="px-4 py-3">

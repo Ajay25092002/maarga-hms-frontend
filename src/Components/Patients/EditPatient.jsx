@@ -30,6 +30,7 @@ const initialForm = {
   address: "",
   pincode: "",
   referral: "",
+  source_of_lead: "",
 };
 
 function getErrorMessage(data, fallback) {
@@ -156,6 +157,7 @@ export default function EditPatient() {
           address: patient.address ?? "",
           pincode: patient.pincode ?? "",
           referral: patient.referral ?? "",
+          source_of_lead: patient.source_of_lead ?? "",
         });
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -275,6 +277,7 @@ export default function EditPatient() {
       address: originalPatient.address ?? "",
       pincode: originalPatient.pincode ?? "",
       referral: originalPatient.referral ?? "",
+      source_of_lead: originalPatient.source_of_lead ?? "",
     });
 
     setErrors({});
@@ -299,6 +302,7 @@ export default function EditPatient() {
         address: form.address.trim(),
         pincode: form.pincode.trim(),
         referral: form.referral.trim() || null,
+        source_of_lead: form.source_of_lead || null,
       };
 
       const response = await fetch(
@@ -633,6 +637,16 @@ export default function EditPatient() {
                 className={`${inputClass} pl-10`}
               />
             </div>
+          </Field>
+          <Field label="Source of Lead (Optional)" name="source_of_lead" error={errors.source_of_lead} labelClass={labelClass}>
+            <select id="source_of_lead" name="source_of_lead" value={form.source_of_lead} onChange={updateField} className={inputClass}>
+              <option value="">Select source of lead</option>
+              <option value="Word of mouth">Word of mouth</option>
+              <option value="Google">Google</option>
+              <option value="Social media">Social media</option>
+              <option value="Maps">Maps</option>
+              <option value="Advertisement">Advertisement</option>
+            </select>
           </Field>
         </div>
 
