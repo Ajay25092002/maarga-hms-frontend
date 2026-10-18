@@ -53,13 +53,12 @@ const REQUIRED_IP_SERVICES = [
   "ADMISSION CHARGES",
 ];
 
-const today = () => {
-  const now = new Date();
-
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-
-  return local.toISOString().slice(0, 10);
-};
+const today = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -1060,8 +1059,6 @@ export default function CreateIPBill() {
 
       patient_id: selectedPatient.patient_id,
 
-      bill_date: `${billDate}T00:00:00`,
-
       admission_date: `${admissionDate}T00:00:00`,
 
       discharge_date: dischargeDate ? `${dischargeDate}T00:00:00` : null,
@@ -1366,6 +1363,7 @@ export default function CreateIPBill() {
 
                     <input
                       type="date"
+                      max={today()}
                       value={admissionDate}
                       onChange={(event) => setAdmissionDate(event.target.value)}
                       className={inputClass}
@@ -1378,6 +1376,7 @@ export default function CreateIPBill() {
 
                     <input
                       type="date"
+                      max={today()}
                       value={dischargeDate}
                       min={admissionDate}
                       onChange={(event) => setDischargeDate(event.target.value)}
@@ -1386,14 +1385,14 @@ export default function CreateIPBill() {
                   </div>
 
                   <div>
-                    <label className={labelClass}>Bill Date *</label>
+                    <label className={labelClass}>Bill Date (automatic)</label>
 
                     <input
                       type="date"
                       value={billDate}
-                      onChange={(event) => setBillDate(event.target.value)}
-                      className={inputClass}
-                      required
+                      disabled
+                      aria-label="Bill creation date (generated automatically)"
+                      className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-75`}
                     />
                   </div>
 
@@ -1645,6 +1644,7 @@ export default function CreateIPBill() {
                                   <td className="min-w-0 px-2 py-3">
                                     <input
                                       type="date"
+                                      max={today()}
                                       value={item.service_date || today()}
                                       onChange={(event) =>
                                         updateCharge(category.id, item.id, {

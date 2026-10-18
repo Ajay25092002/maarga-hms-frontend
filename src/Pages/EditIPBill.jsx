@@ -25,15 +25,12 @@ const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
-const today = () => {
-  const d = new Date();
-
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-
-    .toISOString()
-
-    .slice(0, 10);
-};
+const today = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
 
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : "");
 
@@ -49,8 +46,6 @@ const DISABLED_IP_EDIT_FIELDS = [
   "psychologist_name",
   "rate_category",
   "room_type_id",
-  "admission_date",
-  "discharge_date",
   "bed_number",
 ];
 
@@ -136,17 +131,7 @@ function BillEditScreen({ expectedType }) {
 
         const b = await api(`/api/bills/${billId}`);
 
-        // Block access to the edit screen if any payment exists.
-        if (Array.isArray(b.payments) && b.payments.length > 0) {
-          navigate(`/ip-billing/${billId}`, {
-            replace: true,
-            state: {
-              message:
-                "This bill cannot be edited because a payment has already been recorded.",
-            },
-          });
-          return;
-        }
+
 
         const list = await api(
           `/api/services?bill_type=${b.bill_type}&is_active=true&page=1&page_size=100`,
@@ -642,11 +627,10 @@ function BillEditScreen({ expectedType }) {
                       </label>
                       <input
                         type="date"
+                        max={today()}
                         value={dateOnly(bill.admission_date)}
-                        disabled={DISABLED_IP_EDIT_FIELDS.includes(
-                          "admission_date",
-                        )}
-                        className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
+                        onChange={(event) => setBill((current) => ({ ...current, admission_date: event.target.value || null }))}
+                        className={input}
                       />
                     </div>
                     <div>
@@ -657,11 +641,11 @@ function BillEditScreen({ expectedType }) {
                       </label>
                       <input
                         type="date"
+                        max={today()}
+                        min={dateOnly(bill.admission_date) || undefined}
                         value={dateOnly(bill.discharge_date)}
-                        disabled={DISABLED_IP_EDIT_FIELDS.includes(
-                          "discharge_date",
-                        )}
-                        className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
+                        onChange={(event) => setBill((current) => ({ ...current, discharge_date: event.target.value || null }))}
+                        className={input}
                       />
                     </div>
                     <div>
@@ -773,6 +757,7 @@ function BillEditScreen({ expectedType }) {
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="date"
+                                  max={today()}
                                   className={input}
                                   value={item.service_date || ""}
                                   onChange={(e) =>

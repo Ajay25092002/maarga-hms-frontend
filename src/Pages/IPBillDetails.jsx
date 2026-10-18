@@ -46,15 +46,15 @@ const formatDate = (value, includeTime = false) => {
 
   if (Number.isNaN(parsed.getTime())) return "—";
 
+  const hasTime = typeof value === "string" && value.includes("T");
   return parsed.toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
-
     month: "short",
-
     year: "numeric",
-
-    ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+    ...(includeTime && hasTime
+      ? { hour: "2-digit", minute: "2-digit", hour12: true }
+      : {}),
   });
 };
 
@@ -563,7 +563,7 @@ export default function IPBillDetails() {
                   Back to IP Bills
                 </button>
 
-                {bill?.has_payments === false && (
+                {bill && (
                   <button
                     type="button"
                     onClick={() => navigate(`/ip-billing/${billId}/edit`)}
@@ -686,7 +686,7 @@ export default function IPBillDetails() {
                       <p className={`text-xs ${muted}`}>Bill Date</p>
 
                       <p className={`mt-1 text-sm font-medium ${text}`}>
-                        {formatDate(bill.bill_date ?? bill.created_at)}
+                        {formatDate(bill.bill_date ?? bill.created_at, true)}
                       </p>
                     </div>
 

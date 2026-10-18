@@ -6,7 +6,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 import PaymentForm from "../Components/Payments/PaymentForm";
 import { paymentService } from "../Services/paymentService";
-import { getBillBalance, getErrorMessage, normalizeList, todayInputValue } from "../Components/Payments/paymentUtils";
+import { getBillBalance, getErrorMessage, normalizeList } from "../Components/Payments/paymentUtils";
 
 export default function CreatePayment() {
   const navigate = useNavigate();
@@ -19,7 +19,6 @@ export default function CreatePayment() {
   const [billQuery, setBillQuery] = useState("");
   const [selectedBill, setSelectedBill] = useState(null);
   const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(todayInputValue());
   const [paymentMethod, setPaymentMethod] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -111,7 +110,6 @@ export default function CreatePayment() {
     try {
       const payment = await paymentService.createPayment(selectedBill.id, {
         amount: Number(numericAmount.toFixed(2)),
-        payment_date: new Date(`${paymentDate}T12:00:00`).toISOString(),
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim() || null,
         notes: notes.trim() || null,
@@ -144,7 +142,6 @@ export default function CreatePayment() {
             selectedBill={selectedBill} onSelectBill={selectBill}
             billQuery={billQuery} onBillQueryChange={setBillQuery}
             amount={amount} onAmountChange={setAmount}
-            paymentDate={paymentDate} onPaymentDateChange={setPaymentDate}
             paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod}
             referenceNumber={referenceNumber} onReferenceNumberChange={setReferenceNumber}
             notes={notes} onNotesChange={setNotes}

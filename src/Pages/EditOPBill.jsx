@@ -25,15 +25,12 @@ const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
-const today = () => {
-  const d = new Date();
-
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-
-    .toISOString()
-
-    .slice(0, 10);
-};
+const today = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
 
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : "");
 
@@ -135,22 +132,7 @@ function BillEditScreen({ expectedType }) {
           b.has_payments === true ||
           (Array.isArray(b.payments) && b.payments.length > 0);
 
-        if (hasPayments) {
-          showToast({
-            type: "error",
-            title: "Bill cannot be edited",
-            message: "A payment has already been recorded for this bill.",
-          });
 
-          navigate(
-            String(b.bill_type || "").toUpperCase() === "IP"
-              ? `/ip-billing/${billId}`
-              : `/op-billing/${billId}`,
-            { replace: true },
-          );
-
-          return;
-        }
 
         const list = await api(
           `/api/services?bill_type=${b.bill_type}&is_active=true&page=1&page_size=100`,
@@ -715,6 +697,7 @@ function BillEditScreen({ expectedType }) {
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="date"
+                                  max={today()}
                                   className={input}
                                   value={item.service_date || ""}
                                   onChange={(e) =>

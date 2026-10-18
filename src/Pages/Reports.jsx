@@ -93,22 +93,21 @@ const BASE_FILTERS = {
   status: "",
 };
 
-// Uses the browser's local calendar date. The range is seven calendar days
-// inclusive: today and the six preceding days.
+// Use the hospital's Indian calendar day regardless of the browser timezone.
 function getDefaultDateRange() {
-  const toLocalDateString = (value) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-  const today = new Date();
-  const from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const today = new Date(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()) + "T12:00:00");
+  const toDateString = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  const from = new Date(today);
   from.setDate(from.getDate() - 6);
-  return {
-    date_from: toLocalDateString(from),
-    date_to: toLocalDateString(today),
-  };
+  return { date_from: toDateString(from), date_to: toDateString(today) };
+}
+
+function todayIndia() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
 }
 
 function createDefaultFilters() {
@@ -129,16 +128,55 @@ function queryString(filters, extra = {}) {
   });
   return params.toString();
 }
+function formatCsvValue(value, columnName = "") {
+  if (value === null || value === undefined) return "";
+
+  const isAdmissionOrDischargeDate = /^(admission|discharge) date$/i.test(
+    String(columnName).trim(),
+  );
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value)) {
+    const dateOnly = value.slice(0, 10);
+
+    // Admission and discharge are collected as dates only, never timestamps.
+    if (isAdmissionOrDischargeDate || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = dateOnly.split("-").map(Number);
+      return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    }
+
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
+    const date = new Date(hasTimezone ? value : `${value}+05:30`);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+  }
+
+  return String(value);
+}
+
 function downloadCsv(name, items) {
   const rows = items.map(({ report_date, ...rest }) => rest);
   const columns = rows.length ? Object.keys(rows[0]) : [];
-  const escape = (value) => {
-    const raw = value === null || value === undefined ? "" : String(value);
+  const escape = (value, columnName = "") => {
+    const raw = formatCsvValue(value, columnName);
     return `"${raw.replaceAll('"', '""')}"`;
   };
   const content = [
-    columns.map(escape).join(","),
-    ...rows.map((row) => columns.map((key) => escape(row[key])).join(",")),
+    columns.map((key) => escape(key)).join(","),
+    ...rows.map((row) => columns.map((key) => escape(row[key], key)).join(",")),
   ].join("\r\n");
   const blob = new Blob(["\uFEFF", content], {
     type: "text/csv;charset=utf-8;",
@@ -215,6 +253,19 @@ export default function Reports() {
     setError("");
   }
   function applyFilters() {
+    if (!filters.date_from || !filters.date_to) {
+      setError("Select both a From date and a To date.");
+      return;
+    }
+    if (filters.date_from > filters.date_to) {
+      setError("The From date must be on or before the To date.");
+      return;
+    }
+    if (filters.date_from > todayIndia() || filters.date_to > todayIndia()) {
+      setError("Future report dates are not allowed.");
+      return;
+    }
+    setError("");
     setPage(1);
     setAppliedFilters({ ...filters });
   }
@@ -229,7 +280,8 @@ export default function Reports() {
   const hasValidExportDateRange = Boolean(
     appliedFilters.date_from &&
     appliedFilters.date_to &&
-    appliedFilters.date_from <= appliedFilters.date_to,
+    appliedFilters.date_from <= appliedFilters.date_to &&
+    appliedFilters.date_to <= todayIndia(),
   );
 
   async function exportReport() {
@@ -237,6 +289,10 @@ export default function Reports() {
       setError(
         "Select both a From date and a To date, then apply the filters before downloading.",
       );
+      return;
+    }
+    if (appliedFilters.date_from > todayIndia() || appliedFilters.date_to > todayIndia()) {
+      setError("Future report dates are not allowed.");
       return;
     }
     if (appliedFilters.date_from > appliedFilters.date_to) {

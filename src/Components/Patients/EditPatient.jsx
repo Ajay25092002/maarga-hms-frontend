@@ -454,6 +454,7 @@ export default function EditPatient() {
       timeZone: "Asia/Kolkata",
                     dateStyle: "medium",
                     timeStyle: "short",
+                    hour12: true,
                   },
                 )
               : "—"}

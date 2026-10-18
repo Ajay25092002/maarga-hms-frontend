@@ -1,15 +1,16 @@
 import { Search, RotateCcw } from "lucide-react";
 
 export default function ReportFilters({ reportType, filters, onChange, onApply, onReset, loading }) {
+  const todayIndia = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const set = (key, value) => onChange((current) => ({ ...current, [key]: value }));
   return (
     <form onSubmit={(event) => { event.preventDefault(); onApply(); }} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">From date
-          <input type="date" value={filters.date_from} onChange={(e) => set("date_from", e.target.value)} className="mt-1.5 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-[#3E439C] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+          <input type="date" max={todayIndia} value={filters.date_from} onChange={(e) => set("date_from", e.target.value)} className="mt-1.5 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-[#3E439C] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
         </label>
         <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">To date
-          <input type="date" value={filters.date_to} onChange={(e) => set("date_to", e.target.value)} className="mt-1.5 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-[#3E439C] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+          <input type="date" max={todayIndia} value={filters.date_to} onChange={(e) => set("date_to", e.target.value)} className="mt-1.5 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-[#3E439C] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
         </label>
         <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Search
           <div className="relative mt-1.5"><Search size={15} className="absolute left-3 top-3 text-slate-400" /><input value={filters.search} onChange={(e) => set("search", e.target.value)} placeholder="Search report data..." className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-normal text-slate-700 outline-none focus:border-[#3E439C] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" /></div>

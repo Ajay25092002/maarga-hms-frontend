@@ -30,13 +30,12 @@ import { useToast } from "../Components/Common/useToast";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001";
 
-const today = () => {
-  const now = new Date();
-
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-
-  return local.toISOString().slice(0, 10);
-};
+const today = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
 
 const makeItem = () => ({
   id: `${Date.now()}-${Math.random()}`,
@@ -699,8 +698,6 @@ export default function CreateOPBill() {
       bill_type: "OP",
 
       patient_id: selectedPatient.patient_id,
-
-      bill_date: `${billDate}T00:00:00`,
       rate_category: rateCategory, // Added
 
       // Doctor and psychologist information
@@ -1007,7 +1004,7 @@ export default function CreateOPBill() {
 
                   <div>
                     <label htmlFor="billDate" className={labelClass}>
-                      Bill Date *
+                      Bill Date (automatic)
                     </label>
 
                     <div className="relative">
@@ -1020,9 +1017,9 @@ export default function CreateOPBill() {
                         id="billDate"
                         type="date"
                         value={billDate}
-                        onChange={(event) => setBillDate(event.target.value)}
-                        required
-                        className={`${inputClass} pl-9`}
+                        disabled
+                        aria-label="Bill creation date (generated automatically)"
+                        className={`${inputClass} pl-9 disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
                   </div>
@@ -1194,6 +1191,7 @@ export default function CreateOPBill() {
                             <td className="px-3 py-2.5 align-middle">
                               <input
                                 type="date"
+                                max={today()}
                                 value={item.service_date || ""}
                                 onChange={(event) =>
                                   updateItem(

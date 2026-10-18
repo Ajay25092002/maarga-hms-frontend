@@ -51,17 +51,20 @@ function money(value) {
   }).format(Number(value || 0));
 }
 
-function dateText(value) {
+function dateTimeText(value) {
   if (!value) return "—";
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  return date.toLocaleDateString("en-IN", {
-      timeZone: "Asia/Kolkata",
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -584,7 +587,7 @@ export default function PaymentRefunds() {
                             </td>
 
                             <td className="whitespace-nowrap px-3.5 py-4 text-[13px] text-[#657BA2] dark:text-slate-400">
-                              {dateText(
+                              {dateTimeText(
                                 refund.created_at ??
                                   refund.refund_date ??
                                   refund.created_on,

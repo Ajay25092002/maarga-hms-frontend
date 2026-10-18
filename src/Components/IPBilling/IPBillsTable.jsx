@@ -24,11 +24,13 @@ const formatDate = (value) => {
 
   if (Number.isNaN(date.getTime())) return "—";
 
-  return date.toLocaleDateString("en-IN", {
-      timeZone: "Asia/Kolkata",
+  const hasTime = typeof value === "string" && value.includes("T");
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
+    ...(hasTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
   });
 };
 

@@ -1,12 +1,12 @@
-import { AlertCircle, CalendarDays, CreditCard, IndianRupee, Search, Wallet } from "lucide-react";
-import { formatCurrency, getBillBalance, getBillPaid, getBillTotal, getPatientIdentifier, getPatientName, getPaymentStatus, todayInputValue } from "./paymentUtils";
+import { AlertCircle, CreditCard, IndianRupee, Search, Wallet } from "lucide-react";
+import { formatCurrency, getBillBalance, getBillPaid, getBillTotal, getPatientIdentifier, getPatientName, getPaymentStatus } from "./paymentUtils";
 
 const inputBase = "h-10 w-full rounded-lg border px-3 text-sm outline-none transition focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/15";
 const inputClass = (dark) => `${inputBase} ${dark ? "border-slate-700 bg-[#11121F] text-slate-100 placeholder:text-slate-500" : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"}`;
 
 export default function PaymentForm({
   bills, billsLoading, billsError, selectedBill, onSelectBill, billQuery, onBillQueryChange,
-  amount, onAmountChange, paymentDate, onPaymentDateChange, paymentMethod, onPaymentMethodChange,
+  amount, onAmountChange, paymentMethod, onPaymentMethodChange,
   referenceNumber, onReferenceNumberChange, notes, onNotesChange, submitting, error, onSubmit, onCancel, dark,
 }) {
   const text = dark ? "text-slate-100" : "text-slate-800";
@@ -46,10 +46,9 @@ export default function PaymentForm({
       </section>
 
       <section className={`rounded-xl border p-4 sm:p-5 ${dark ? "border-slate-700 bg-[#191A2B]" : "border-slate-200 bg-white"}`}>
-        <div className="mb-4 flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F1F0FF] text-[#3E439C]"><Wallet size={18}/></span><div><h2 className={`text-sm font-semibold ${text}`}>Payment details</h2><p className={`mt-0.5 text-xs ${muted}`}>Enter the amount received and payment reference.</p></div></div>
+        <div className="mb-4 flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F1F0FF] text-[#3E439C]"><Wallet size={18}/></span><div><h2 className={`text-sm font-semibold ${text}`}>Payment details</h2><p className={`mt-0.5 text-xs ${muted}`}>Payment date and time are recorded automatically when you save the payment.</p></div></div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label><span className={`mb-1.5 block text-xs font-medium ${muted}`}>Payment amount (₹) *</span><span className="relative block"><IndianRupee size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}/><input required type="number" min="0.01" step="0.01" max={selectedBill ? getBillBalance(selectedBill) : undefined} value={amount} onChange={(e) => onAmountChange(e.target.value)} className={`${inputClass(dark)} pl-9`} placeholder="0.00" /></span>{selectedBill && Number(amount) > getBillBalance(selectedBill) && <span className="mt-1 block text-xs text-rose-600">Payment cannot exceed the outstanding balance.</span>}</label>
-          <label><span className={`mb-1.5 block text-xs font-medium ${muted}`}>Payment date *</span><span className="relative block"><CalendarDays size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}/><input required type="date" value={paymentDate} max={todayInputValue()} onChange={(e) => onPaymentDateChange(e.target.value)} className={`${inputClass(dark)} pl-9`}/></span></label>
           <label><span className={`mb-1.5 block text-xs font-medium ${muted}`}>Payment mode *</span><span className="relative block"><CreditCard size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}/><select required value={paymentMethod} onChange={(e) => onPaymentMethodChange(e.target.value)} className={`${inputClass(dark)} pl-9`}><option value="">Select payment mode</option><option>Cash</option><option>UPI</option><option>Card</option><option>Bank Transfer</option><option>Cheque</option></select></span></label>
           <label><span className={`mb-1.5 block text-xs font-medium ${muted}`}>Transaction / reference number</span><input maxLength={150} value={referenceNumber} onChange={(e) => onReferenceNumberChange(e.target.value)} className={inputClass(dark)} placeholder="Optional for cash; enter for digital payments"/></label>
           <label className="md:col-span-2"><span className={`mb-1.5 block text-xs font-medium ${muted}`}>Notes</span><textarea rows={3} maxLength={2000} value={notes} onChange={(e) => onNotesChange(e.target.value)} className={`${inputClass(dark)} h-auto py-2`} placeholder="Optional payment remarks"/></label>
