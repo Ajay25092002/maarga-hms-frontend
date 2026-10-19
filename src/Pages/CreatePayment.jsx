@@ -6,7 +6,11 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 import PaymentForm from "../Components/Payments/PaymentForm";
 import { paymentService } from "../Services/paymentService";
-import { getBillBalance, getErrorMessage, normalizeList } from "../Components/Payments/paymentUtils";
+import {
+  getBillBalance,
+  getErrorMessage,
+  normalizeList,
+} from "../Components/Payments/paymentUtils";
 
 export default function CreatePayment() {
   const navigate = useNavigate();
@@ -25,33 +29,39 @@ export default function CreatePayment() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-
-
   const loadBills = useCallback(async () => {
-  setBillsLoading(true);
-  setBillsError("");
+    setBillsLoading(true);
+    setBillsError("");
 
-  try {
-    const payload = await paymentService.listBills({
-      page: 1,
-      page_size: 5,
-      search: billQuery.trim() || undefined,
-    });
+    try {
+      const payload = await paymentService.listBills({
+        page: 1,
+        page_size: 5,
+        search: billQuery.trim() || undefined,
+      });
 
-    const rows = normalizeList(payload);
+      const rows = normalizeList(payload);
 
-    setBills(
-      rows
-        .filter((bill) => getBillBalance(bill) > 0)
-        .slice(0, 5)
-    );
-  } catch (err) {
-    setBills([]);
-    setBillsError(getErrorMessage(err, "Unable to load bills."));
-  } finally {
-    setBillsLoading(false);
-  }
-}, [billQuery]);
+      setBills(
+        rows
+          .filter((bill) => {
+            const billType = String(bill.bill_type || "")
+              .trim()
+              .toUpperCase();
+
+            // OP: show only bills with an outstanding balance.
+            // IP: also show fully paid bills.
+            return billType === "IP" || getBillBalance(bill) > 0;
+          })
+          .slice(0, 5),
+      );
+    } catch (err) {
+      setBills([]);
+      setBillsError(getErrorMessage(err, "Unable to load bills."));
+    } finally {
+      setBillsLoading(false);
+    }
+  }, [billQuery]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadBills, billQuery ? 250 : 0);
@@ -62,15 +72,25 @@ export default function CreatePayment() {
     const billId = searchParams.get("bill_id");
     if (!billId) return;
     let active = true;
-    paymentService.getBill(billId).then((bill) => {
-      if (active) {
-        setSelectedBill(bill);
-        setBills((current) => current.some((item) => String(item.id) === String(bill.id)) ? current : [bill, ...current]);
-      }
-    }).catch((err) => {
-      if (active) setError(getErrorMessage(err, "Unable to load the selected bill."));
-    });
-    return () => { active = false; };
+    paymentService
+      .getBill(billId)
+      .then((bill) => {
+        if (active) {
+          setSelectedBill(bill);
+          setBills((current) =>
+            current.some((item) => String(item.id) === String(bill.id))
+              ? current
+              : [bill, ...current],
+          );
+        }
+      })
+      .catch((err) => {
+        if (active)
+          setError(getErrorMessage(err, "Unable to load the selected bill."));
+      });
+    return () => {
+      active = false;
+    };
   }, [searchParams]);
 
   const selectBill = async (bill) => {
@@ -97,10 +117,25 @@ export default function CreatePayment() {
       setError("Enter a payment amount greater than zero.");
       return;
     }
-    if (numericAmount > balance) {
-      setError("Payment amount cannot exceed the current outstanding balance.");
+
+    const billType = String(selectedBill.bill_type || "")
+      .trim()
+      .toUpperCase();
+    if (billType === "OP" && numericAmount > balance + 0.000001) {
+      setError(
+        `OP bill payments cannot exceed the outstanding balance of ${new Intl.NumberFormat(
+          "en-IN",
+          {
+            style: "currency",
+            currency: "INR",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          },
+        ).format(balance)}.`,
+      );
       return;
     }
+
     if (!paymentMethod) {
       setError("Select a payment mode.");
       return;
@@ -118,7 +153,13 @@ export default function CreatePayment() {
       if (paymentId) {
         navigate(`/payments/receipts/${paymentId}`, { replace: true });
       } else {
-        navigate("/payments", { replace: true, state: { notice: "Payment recorded. The API did not return a payment ID, so open the payment list to view it." } });
+        navigate("/payments", {
+          replace: true,
+          state: {
+            notice:
+              "Payment recorded. The API did not return a payment ID, so open the payment list to view it.",
+          },
+        });
       }
     } catch (err) {
       setError(getErrorMessage(err, "Unable to record payment."));
@@ -128,25 +169,65 @@ export default function CreatePayment() {
   };
 
   return (
-    <div className={`min-h-screen min-w-0 ${dark ? "bg-[#11121F]" : "bg-[#F6F6FC]"}`}>
+    <div
+      className={`min-h-screen min-w-0 ${dark ? "bg-[#11121F]" : "bg-[#F6F6FC]"}`}
+    >
       <AppSidebar />
       <div className="min-h-screen min-w-0 md:ml-[72px] lg:ml-[260px]">
-        <TopNavbar title="Create Payment" breadcrumb={["Hospital Management", "Billing", "Payments", "Create Payment"]}/>
+        <TopNavbar
+          title="Create Payment"
+          breadcrumb={[
+            "Hospital Management",
+            "Billing",
+            "Payments",
+            "Create Payment",
+          ]}
+        />
         <main className="min-w-0 space-y-5 px-4 py-5 sm:px-5 lg:px-6">
           <div className="flex items-start gap-3">
-            <button type="button" onClick={() => navigate("/payments")} aria-label="Back to payments" className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${dark ? "border-slate-700 text-slate-200" : "border-slate-200 bg-white text-slate-700"}`}><ArrowLeft size={17}/></button>
-            <div className="min-w-0"><h1 className={`text-xl font-bold ${dark ? "text-slate-100" : "text-slate-900"}`}>Create Payment</h1><p className={`mt-1 text-sm ${dark ? "text-slate-400" : "text-slate-500"}`}>Record money received against an existing bill. Payment records cannot be edited from this screen.</p></div>
+            <button
+              type="button"
+              onClick={() => navigate("/payments")}
+              aria-label="Back to payments"
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${dark ? "border-slate-700 text-slate-200" : "border-slate-200 bg-white text-slate-700"}`}
+            >
+              <ArrowLeft size={17} />
+            </button>
+            <div className="min-w-0">
+              <h1
+                className={`text-xl font-bold ${dark ? "text-slate-100" : "text-slate-900"}`}
+              >
+                Create Payment
+              </h1>
+              <p
+                className={`mt-1 text-sm ${dark ? "text-slate-400" : "text-slate-500"}`}
+              >
+                Record money received against an existing bill. Payment records
+                cannot be edited from this screen.
+              </p>
+            </div>
           </div>
           <PaymentForm
-            bills={bills} billsLoading={billsLoading} billsError={billsError}
-            selectedBill={selectedBill} onSelectBill={selectBill}
-            billQuery={billQuery} onBillQueryChange={setBillQuery}
-            amount={amount} onAmountChange={setAmount}
-            paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod}
-            referenceNumber={referenceNumber} onReferenceNumberChange={setReferenceNumber}
-            notes={notes} onNotesChange={setNotes}
-            submitting={submitting} error={error} onSubmit={submitPayment}
-            onCancel={() => navigate("/payments")} dark={dark}
+            bills={bills}
+            billsLoading={billsLoading}
+            billsError={billsError}
+            selectedBill={selectedBill}
+            onSelectBill={selectBill}
+            billQuery={billQuery}
+            onBillQueryChange={setBillQuery}
+            amount={amount}
+            onAmountChange={setAmount}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
+            referenceNumber={referenceNumber}
+            onReferenceNumberChange={setReferenceNumber}
+            notes={notes}
+            onNotesChange={setNotes}
+            submitting={submitting}
+            error={error}
+            onSubmit={submitPayment}
+            onCancel={() => navigate("/payments")}
+            dark={dark}
           />
         </main>
       </div>

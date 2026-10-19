@@ -43,7 +43,7 @@ function display(value, key) {
 
   if (
     typeof value === "number" &&
-    /amount|paid|refunded|outstanding|quantity/i.test(String(key))
+    /amount|paid|refunded|outstanding|deposit|quantity/i.test(String(key))
   ) {
     return value.toLocaleString("en-IN", {
       minimumFractionDigits: 2,

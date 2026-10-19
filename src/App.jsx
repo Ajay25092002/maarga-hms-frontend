@@ -15,6 +15,9 @@ import OPBillDetails from "./Pages/OPBillDetails";
 import EditOPBill from "./Pages/EditOPBill";
 
 import IPBills from "./Pages/IPBills";
+import NurseServices from "./Pages/NurseServices";
+import NurseBillDetails from "./Pages/NurseBillDetails";
+import NurseEditIPBill from "./Pages/NurseEditIPBill";
 import CreateIPBill from "./Pages/CreateIPBill";
 import IPBillDetails from "./Pages/IPBillDetails";
 import EditIPBill from "./Pages/EditIPBill";
@@ -170,6 +173,32 @@ export default function App() {
         element={
           <ProtectedRoute permission="bills.ip.edit">
             <EditIPBill />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Nurse module reuses the IP-billing list pattern with a restricted add-services editor. */}
+      <Route
+        path="/nurse"
+        element={
+          <ProtectedRoute permission="nurse.view">
+            <NurseServices />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/nurse/:billId"
+        element={
+          <ProtectedRoute permission="nurse.view">
+            <NurseBillDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/nurse/:billId/edit"
+        element={
+          <ProtectedRoute permission="nurse.add_services">
+            <NurseEditIPBill />
           </ProtectedRoute>
         }
       />

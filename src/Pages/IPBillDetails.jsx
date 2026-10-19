@@ -1069,6 +1069,13 @@ export default function IPBillDetails() {
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
+                    <span className={`text-sm ${muted}`}>Deposit Balance</span>
+                    <span className={`text-sm font-semibold ${text}`}>
+                      {currency(Math.max(0, Math.max(0, totalPayments - totalRefunds) - total))}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm font-semibold ${text}`}>
                       Outstanding Balance
                     </span>

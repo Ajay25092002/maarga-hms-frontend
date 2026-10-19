@@ -33,6 +33,10 @@ const GROUPS = [
     keys: ["bills.ip.view", "bills.ip.create","bills.ip.edit"],
   },
   {
+    title: "Nurse",
+    keys: ["nurse.view", "nurse.add_services"],
+  },
+  {
     title: "Payments & Receipts",
     keys: ["payments.view", "payments.create"],
   },

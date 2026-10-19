@@ -133,6 +133,13 @@ const groups = [
           pathname === "/ip-billing" || pathname.startsWith("/ip-billing/"),
       },
       {
+        label: "Nurse",
+        path: "/nurse",
+        icon: BedDouble,
+        permission: "nurse.view",
+        isActive: (pathname) => pathname === "/nurse" || pathname.startsWith("/nurse/"),
+      },
+      {
         label: "Payments & Receipts",
         path: "/payments",
         icon: Wallet,

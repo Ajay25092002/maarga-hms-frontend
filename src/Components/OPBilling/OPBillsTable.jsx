@@ -1,3 +1,4 @@
+
 import {
   Table,
   TableHeader,
@@ -7,7 +8,7 @@ import {
   TableCell,
 } from "../ui/table";
 
-import { ReceiptText, Eye, FileText } from "lucide-react";
+import { ReceiptText, FileText } from "lucide-react";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -25,12 +26,19 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return "—";
 
   const hasTime = typeof value === "string" && value.includes("T");
+
   return date.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
-    ...(hasTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
+    ...(hasTime
+      ? {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }
+      : {}),
   });
 };
 
@@ -43,32 +51,73 @@ const getPatientId = (bill) =>
 const getBillNumber = (bill) =>
   bill?.bill_number ?? bill?.id ?? "—";
 
-const getTotal = (bill) => Number(bill?.total_amount ?? 0);
+const getTotal = (bill) =>
+  Math.max(0, Number(bill?.total_amount ?? 0) || 0);
 
-const getPaid = (bill) => Number(bill?.amount_paid ?? 0);
+/**
+ * Original/gross payments received before refunds.
+ * Prefer total_payments when the API provides it.
+ */
+const getTotalPayments = (bill) => {
+  const value =
+    bill?.total_payments ??
+    bill?.payments_received ??
+    bill?.amount_paid ??
+    0;
 
-const getRefunds = (bill) => Number(bill?.total_refunds ?? bill?.refund_amount ?? 0);
+  return Math.max(0, Number(value) || 0);
+};
 
-const getOutstanding = (bill) =>
-  Number(
-    bill?.outstanding_amount ??
-      Math.max(0, getTotal(bill) - getPaid(bill))
-  );
+const getRefunds = (bill) => {
+  const value =
+    bill?.total_refunds ??
+    bill?.refund_amount ??
+    0;
 
+  return Math.max(0, Number(value) || 0);
+};
+
+/**
+ * Refunds affect net paid, not the original payment total.
+ */
+const getNetPaid = (bill) =>
+  Math.max(0, getTotalPayments(bill) - getRefunds(bill));
+
+/**
+ * Outstanding is calculated from the original payments.
+ * A refund must not reopen a fully paid bill.
+ */
+const getOutstanding = (bill) => {
+  const total = getTotal(bill);
+  const payments = getTotalPayments(bill);
+
+  return Math.max(0, total - payments);
+};
+
+/**
+ * Payment status is based on original payments, not net paid.
+ * Recognized backend statuses are retained.
+ */
 const getStatus = (bill) => {
   const status = String(
     bill?.payment_status ?? bill?.status ?? ""
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
   if (status === "cancelled" || status === "canceled") {
     return "Cancelled";
   }
 
+  const total = getTotal(bill);
+  const payments = getTotalPayments(bill);
+
+  // Prefer explicit backend status when available.
   if (status === "paid") return "Paid";
 
   if (
     status === "partially_paid" ||
-    status === "partially paid" ||
     status === "partial"
   ) {
     return "Partially Paid";
@@ -76,11 +125,12 @@ const getStatus = (bill) => {
 
   if (status === "unpaid") return "Unpaid";
 
-  const total = getTotal(bill);
-  const paid = getPaid(bill);
+  // Fallback: determine status using original payments.
+  if (total > 0 && payments >= total) return "Paid";
 
-  if (total > 0 && paid >= total) return "Paid";
-  if (paid > 0 && paid < total) return "Partially Paid";
+  if (payments > 0 && payments < total) {
+    return "Partially Paid";
+  }
 
   return "Unpaid";
 };
@@ -142,7 +192,7 @@ export default function OPBillsTable({
 
   const actionButtonClass = [
     "inline-flex h-8 items-center justify-center gap-1.5",
-    "rounded-md border px-5 cursor-pointer ",
+    "rounded-md border px-5 cursor-pointer",
     "text-xs font-medium transition-colors",
     "focus-visible:outline-none focus-visible:ring-2",
     "focus-visible:ring-[#3E439C]/30",
@@ -164,36 +214,47 @@ export default function OPBillsTable({
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Bill Number
               </TableHead>
+
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Bill Date
               </TableHead>
+
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Billed By
               </TableHead>
+
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Patient
               </TableHead>
+
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Patient ID / UHID
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Total Amount
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Payments Received
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Refund Amount
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Net Paid
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Outstanding
               </TableHead>
+
               <TableHead className="px-4 text-left text-xs font-semibold">
                 Status
               </TableHead>
+
               <TableHead className="px-4 text-right text-xs font-semibold">
                 Actions
               </TableHead>
@@ -225,7 +286,10 @@ export default function OPBillsTable({
               ))
             ) : bills.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="h-48 px-4 text-center">
+                <TableCell
+                  colSpan={12}
+                  className="h-48 px-4 text-center"
+                >
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-full ${
@@ -235,7 +299,9 @@ export default function OPBillsTable({
                       <ReceiptText
                         size={21}
                         className={
-                          dark ? "text-[#D6D4FF]" : "text-[#3E439C]"
+                          dark
+                            ? "text-[#D6D4FF]"
+                            : "text-[#3E439C]"
                         }
                       />
                     </div>
@@ -257,10 +323,11 @@ export default function OPBillsTable({
                 const billNumber = getBillNumber(bill);
                 const patientName = getPatientName(bill);
                 const patientId = getPatientId(bill);
+
                 const total = getTotal(bill);
-                const paid = getPaid(bill);
-                const totalPayments = Number(bill?.total_payments ?? paid);
+                const totalPayments = getTotalPayments(bill);
                 const refunds = getRefunds(bill);
+                const netPaid = getNetPaid(bill);
                 const outstanding = getOutstanding(bill);
                 const status = getStatus(bill);
 
@@ -278,9 +345,12 @@ export default function OPBillsTable({
                         <FileText
                           size={16}
                           className={
-                            dark ? "text-[#B9B7FF]" : "text-[#3E439C]"
+                            dark
+                              ? "text-[#B9B7FF]"
+                              : "text-[#3E439C]"
                           }
                         />
+
                         <span
                           className={`whitespace-nowrap text-xs font-semibold ${theme.billNumber}`}
                         >
@@ -295,8 +365,13 @@ export default function OPBillsTable({
                       {formatDate(bill?.bill_date ?? bill?.created_at)}
                     </TableCell>
 
-                    <TableCell className={`max-w-[180px] px-4 py-3 text-xs ${theme.secondaryText}`}>
-                      <span className="block truncate" title={bill?.created_by_name || "Not recorded"}>
+                    <TableCell
+                      className={`max-w-[180px] px-4 py-3 text-xs ${theme.secondaryText}`}
+                    >
+                      <span
+                        className="block truncate"
+                        title={bill?.created_by_name || "Not recorded"}
+                      >
                         {bill?.created_by_name || "Not recorded"}
                       </span>
                     </TableCell>
@@ -329,7 +404,11 @@ export default function OPBillsTable({
                     </TableCell>
 
                     <TableCell
-                      className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${refunds > 0 ? "text-red-600 dark:text-red-400" : theme.primaryText}`}
+                      className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${
+                        refunds > 0
+                          ? "text-red-600 dark:text-red-400"
+                          : theme.primaryText
+                      }`}
                     >
                       {formatCurrency(refunds)}
                     </TableCell>
@@ -337,7 +416,7 @@ export default function OPBillsTable({
                     <TableCell
                       className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${theme.primaryText}`}
                     >
-                      {formatCurrency(Math.max(0, totalPayments - refunds))}
+                      {formatCurrency(netPaid)}
                     </TableCell>
 
                     <TableCell
@@ -355,11 +434,13 @@ export default function OPBillsTable({
                     <TableCell className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge status={status} dark={dark} />
-                        {bill?.refund_status && bill.refund_status !== "Not Refunded" && (
-                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-300">
-                            {bill.refund_status}
-                          </span>
-                        )}
+
+                        {bill?.refund_status &&
+                          bill.refund_status !== "Not Refunded" && (
+                            <span className="text-[10px] font-medium text-rose-600 dark:text-rose-300">
+                              {bill.refund_status}
+                            </span>
+                          )}
                       </div>
                     </TableCell>
 

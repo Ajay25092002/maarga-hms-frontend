@@ -196,6 +196,10 @@ export default function IPBillsTable({
               </TableHead>
 
               <TableHead className="px-4 text-right text-xs font-semibold">
+                Deposit Balance
+              </TableHead>
+
+              <TableHead className="px-4 text-right text-xs font-semibold">
                 Outstanding
               </TableHead>
 
@@ -216,7 +220,7 @@ export default function IPBillsTable({
                   key={`ip-bill-skeleton-${index}`}
                   className={`h-[68px] border-b ${theme.row}`}
                 >
-                  {Array.from({ length: 12 }).map((_, cellIndex) => (
+                  {Array.from({ length: 13 }).map((_, cellIndex) => (
                     <TableCell
                       key={`ip-bill-cell-${cellIndex}`}
                       className="px-4 py-3"
@@ -232,7 +236,7 @@ export default function IPBillsTable({
               ))
             ) : bills.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="h-48 px-4 text-center">
+                <TableCell colSpan={13} className="h-48 px-4 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-full ${
@@ -336,6 +340,12 @@ export default function IPBillsTable({
                       className={`whitespace-nowrap px-4 py-3 text-right text-xs tabular-nums ${theme.primaryText}`}
                     >
                       {formatCurrency(Math.max(0, totalPayments - refunds))}
+                    </TableCell>
+
+                    <TableCell
+                      className={`whitespace-nowrap px-4 py-3 text-right text-xs font-medium tabular-nums ${theme.primaryText}`}
+                    >
+                      {formatCurrency(Math.max(0, Number(bill?.deposit_balance ?? (Math.max(0, Number(bill?.total_payments ?? paid) - refunds) - total))))}
                     </TableCell>
 
                     <TableCell

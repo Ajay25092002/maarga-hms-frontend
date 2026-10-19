@@ -6,6 +6,7 @@ const GROUPS = [
   { title: "IP Patients", prefix: "patients.ip." },
   { title: "OP Billing", prefix: "bills.op." },
   { title: "IP Billing", prefix: "bills.ip." },
+  { title: "Nurse", prefix: "nurse." },
   { title: "Payments & Receipts", prefix: "payments." },
   { title: "Payment Refunds", prefix: "refunds." },
   { title: "Reports", prefix: "reports." },
@@ -17,6 +18,7 @@ const actionLabels = {
   view: "View",
   create: "Create",
   edit: "Edit",
+  add_services: "Add Services",
   delete: "Delete",
   manage: "Manage",
 };
