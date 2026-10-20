@@ -4,7 +4,7 @@ import { KeyRound, Save, UserRound } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
 const inputBase =
@@ -20,6 +20,7 @@ export default function UserForm({
   const dark = theme === "dark";
 
   const [form, setForm] = useState({
+    login_id: "",
     full_name: "",
     email: "",
     password: "",
@@ -36,6 +37,7 @@ export default function UserForm({
     if (!initialData) return;
 
     setForm({
+      login_id: initialData.login_id || "",
       full_name: initialData.full_name || "",
       email: initialData.email || "",
       password: "",
@@ -110,6 +112,18 @@ export default function UserForm({
     event.preventDefault();
     setValidationError("");
 
+    if (!/^USR[0-9]{5,}$/.test(form.login_id.trim().toUpperCase())) {
+      setValidationError(
+        "Enter a valid User ID, for example USR00105 (USR followed by at least five digits)."
+      );
+      return;
+    }
+
+    if (!form.full_name.trim()) {
+      setValidationError("Please enter the user's full name.");
+      return;
+    }
+
     if (!form.role_id) {
       setValidationError("Please select a role for this user.");
       return;
@@ -120,9 +134,21 @@ export default function UserForm({
       return;
     }
 
+    if (form.email.trim()) {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailPattern.test(form.email.trim())) {
+        setValidationError("Please enter a valid email address.");
+        return;
+      }
+    }
+
     const payload = {
+      login_id: form.login_id.trim().toUpperCase(),
       full_name: form.full_name.trim(),
-      email: form.email.trim().toLowerCase(),
+      email: form.email.trim()
+        ? form.email.trim().toLowerCase()
+        : null,
       role_id: Number(form.role_id),
       is_active: form.is_active,
     };
@@ -150,16 +176,45 @@ export default function UserForm({
           <div>
             <h2 className="text-sm font-semibold">User Information</h2>
             <p className={helperClass}>
-              Enter the user's name and login email address.
+              Enter a unique User ID and the user's details.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-x-5 gap-y-3.5 md:grid-cols-2">
           <div className="min-w-0">
+            <label className={labelClass} htmlFor="login_id">
+              User ID <span className="text-red-500">*</span>
+            </label>
+
+            <input
+              id="login_id"
+              name="login_id"
+              type="text"
+              className={inputClass}
+              value={form.login_id}
+              onChange={(e) =>
+                setField("login_id", e.target.value.toUpperCase())
+              }
+              minLength={8}
+              maxLength={20}
+              pattern="USR[0-9]{5,}"
+              autoComplete="off"
+              required
+              placeholder="e.g. USR00105"
+              aria-describedby="login_id_help"
+            />
+
+            <p id="login_id_help" className={helperClass}>
+              Enter a unique ID using USR followed by at least five digits.
+            </p>
+          </div>
+
+          <div className="min-w-0">
             <label className={labelClass} htmlFor="full_name">
               Full Name <span className="text-red-500">*</span>
             </label>
+
             <input
               id="full_name"
               name="full_name"
@@ -177,8 +232,10 @@ export default function UserForm({
 
           <div className="min-w-0">
             <label className={labelClass} htmlFor="email">
-              Email Address <span className="text-red-500">*</span>
+              Email Address{" "}
+              <span className={helperClass}>(Optional)</span>
             </label>
+
             <input
               id="email"
               name="email"
@@ -188,11 +245,11 @@ export default function UserForm({
               onChange={(e) => setField("email", e.target.value)}
               maxLength={255}
               autoComplete="email"
-              required
-              placeholder="Enter email address"
+              placeholder="Enter email address (optional)"
             />
+
             <p className={helperClass}>
-              This email address will be used to log in.
+              Email address is optional. Leave blank if unavailable.
             </p>
           </div>
         </div>
@@ -250,7 +307,9 @@ export default function UserForm({
           <div className="min-w-0">
             <label className={labelClass} htmlFor="password">
               {initialData ? "New Password" : "Password"}
-              {!initialData && <span className="text-red-500"> *</span>}
+              {!initialData && (
+                <span className="text-red-500"> *</span>
+              )}
             </label>
 
             <input
@@ -285,7 +344,9 @@ export default function UserForm({
           }`}
         >
           <span className="min-w-0">
-            <span className="block text-sm font-medium">Account Status</span>
+            <span className="block text-sm font-medium">
+              Account Status
+            </span>
             <span className={helperClass}>
               {form.is_active
                 ? "This account is active and enabled."
@@ -312,6 +373,7 @@ export default function UserForm({
           }`}
         >
           <span>{errorMessage}</span>
+
           <button
             type="button"
             onClick={() => {

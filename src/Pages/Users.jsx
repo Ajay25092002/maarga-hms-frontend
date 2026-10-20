@@ -19,7 +19,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
 function getErrorMessage(data, fallback) {
@@ -445,6 +445,10 @@ export default function Users() {
                           {/* Name and email */}
                           <td className="px-4 py-3.5">
                             <div className="font-medium">{user.full_name}</div>
+
+                            <div className={`mt-1 text-xs font-semibold tracking-wide text-[#3E439C] dark:text-[#A5A7FF]`}>
+                              User ID: {user.login_id || "Pending"}
+                            </div>
 
                             <div
                               className={`mt-1 break-words text-xs ${muted}`}

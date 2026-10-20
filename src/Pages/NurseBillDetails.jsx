@@ -259,7 +259,6 @@ export default function NurseBillDetails() {
 
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const [pdfLoading, setPdfLoading] = useState(false);
 
 
 
@@ -425,90 +424,7 @@ export default function NurseBillDetails() {
       "border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
   }[status];
 
-  const handlePrintPdf = async () => {
-    if (!billId || !bill || pdfLoading) return;
 
-    const printWindow = window.open("about:blank", "_blank");
-
-    if (!printWindow) {
-      window.alert(
-        "Your browser blocked the PDF tab. Allow pop-ups and try again.",
-      );
-
-      return;
-    }
-
-    printWindow.document.title = "IP Bill PDF";
-
-    printWindow.document.body.innerHTML =
-      '<p style="font-family:Arial,sans-serif;padding:24px">Preparing your IP bill PDF...</p>';
-
-    setPdfLoading(true);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/ip-pdf`,
-
-        {
-          method: "GET",
-
-          credentials: "include",
-
-          headers: { Accept: "application/pdf" },
-        },
-      );
-
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type") || "";
-
-        let message = `Unable to generate IP PDF (HTTP ${response.status}).`;
-
-        if (contentType.includes("application/json")) {
-          message = getErrorMessage(
-            await response.json().catch(() => null),
-
-            message,
-          );
-        } else {
-          const bodyText = await response.text().catch(() => "");
-
-          if (bodyText) message = bodyText;
-        }
-
-        throw new Error(message);
-      }
-
-      if (
-        !(response.headers.get("content-type") || "").includes(
-          "application/pdf",
-        )
-      ) {
-        throw new Error("The server did not return a PDF document.");
-      }
-
-      const blob = await response.blob();
-
-      if (!blob.size) {
-        throw new Error("The server returned an empty PDF.");
-      }
-
-      const pdfUrl = URL.createObjectURL(blob);
-
-      printWindow.location.href = pdfUrl;
-
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10 * 60 * 1000);
-    } catch (err) {
-      console.error("Failed to open IP bill PDF:", err);
-
-      printWindow.close();
-
-      window.alert(
-        err instanceof Error ? err.message : "Unable to open the IP bill PDF.",
-      );
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   const buttonClass = `inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium ${border} ${text} ${
     dark ? "hover:bg-slate-800" : "hover:bg-white"
@@ -579,20 +495,7 @@ export default function NurseBillDetails() {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handlePrintPdf}
-                  disabled={loading || !bill || Boolean(error) || pdfLoading}
-                  className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white hover:bg-[#323780] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {pdfLoading ? (
-                    <RefreshCw size={16} className="animate-spin" />
-                  ) : (
-                    <Printer size={16} />
-                  )}
-
-                  {pdfLoading ? "Preparing PDF..." : "Print PDF"}
-                </button>
+                
               </div>
             </div>
 

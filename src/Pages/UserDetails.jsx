@@ -17,7 +17,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
 function getErrorMessage(data, fallback) {
@@ -322,7 +322,7 @@ export default function UserDetails() {
 
                     <DetailField
                       label="User ID"
-                      value={user.id}
+                      value={user.login_id}
                       dark={dark}
                     />
                   </div>

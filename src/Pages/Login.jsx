@@ -4,7 +4,7 @@ import {
   Eye,
   EyeOff,
   LockKeyhole,
-  Mail,
+  Hash,
   ShieldCheck,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -19,7 +19,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { refreshAuth } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -30,8 +30,8 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   setError("");
 
-  if (!email.trim() || !password) {
-    setError("Please enter your email and password.");
+  if (!loginId.trim() || !password) {
+    setError("Please enter your User ID and password.");
     return;
   }
 
@@ -45,7 +45,7 @@ const handleSubmit = async (e) => {
       },
       credentials: "include",
       body: JSON.stringify({
-        email: email.trim(),
+        login_id: loginId.trim().toUpperCase(),
         password,
       }),
     });
@@ -118,31 +118,34 @@ const handleSubmit = async (e) => {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
+            {/* Company-facing User ID */}
             <div>
               <label
-                htmlFor="email"
+                htmlFor="login_id"
                 className="mb-1.5 block text-sm font-medium"
               >
-                Work email
+                User ID
               </label>
 
               <div className="relative">
-                <Mail
+                <Hash
                   size={17}
                   strokeWidth={1.8}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 />
 
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="login_id"
+                  name="login_id"
+                  type="text"
                   autoComplete="username"
-                  placeholder="Enter your work email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your User ID (e.g. USR00105)"
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value.toUpperCase())}
                   required
+                  minLength={8}
+                  maxLength={20}
+                  autoCapitalize="characters"
                   disabled={isLoading}
                   className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-[#3E439C] focus:ring-2 focus:ring-[#3E439C]/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-[#191A29] dark:placeholder:text-gray-500"
                 />

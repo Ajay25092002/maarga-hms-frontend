@@ -8,7 +8,7 @@ import NurseBillsList from "../Components/IPBilling/NurseBillsList";
 import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
 const PAGE_SIZE = 10;

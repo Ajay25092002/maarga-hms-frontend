@@ -18,7 +18,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001"
 ).replace(/\/+$/, "");
 
 const REFUNDS_API = `${API_BASE_URL}/api/payment-refunds`;
@@ -430,6 +430,8 @@ export default function RecordPaymentRefund() {
         total_refunded: Number(
           result.total_refunded ?? result.refunded_amount ?? 0,
         ),
+        bill_type: String(result.bill_type ?? bill.bill_type ?? "").toUpperCase(),
+        deposit_balance: Number(result.deposit_balance ?? 0),
         refundable_balance: Number(result.refundable_balance ?? result.remaining_balance ?? result.balance ?? 0),
       };
 
@@ -578,7 +580,7 @@ export default function RecordPaymentRefund() {
                   Refund Information
                 </h2>
                 <p className={`mt-1 text-[13px] ${muted}`}>
-                  Only fully paid bills with a remaining refundable amount can be selected.
+                  OP refunds use the amount paid. For IP bills, only the deposit balance (payment above the bill total) is refundable.
                 </p>
               </div>
 
@@ -652,10 +654,17 @@ export default function RecordPaymentRefund() {
                       </div>
 
                       <div>
-                        <p className={`text-xs ${muted}`}>Refundable Balance</p>
+                        <p className={`text-xs ${muted}`}>
+                          {balance.bill_type === "IP" ? "Refundable Deposit Balance" : "Refundable Balance"}
+                        </p>
                         <p className="mt-1 text-sm font-semibold text-[#3E439C] dark:text-[#D6D4FF]">
                           {money(balance.refundable_balance)}
                         </p>
+                        {balance.bill_type === "IP" && (
+                          <p className={`mt-1 text-xs ${muted}`}>
+                            Only the amount paid above the IP bill total can be refunded.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </section>
@@ -690,7 +699,7 @@ export default function RecordPaymentRefund() {
                     </div>
                     {balance && (
                       <p className={`text-xs ${muted}`}>
-                        Maximum refundable: {money(balance.refundable_balance)}
+                        {balance.bill_type === "IP" ? "Maximum refundable deposit" : "Maximum refundable"}: {money(balance.refundable_balance)}
                       </p>
                     )}
                   </Field>

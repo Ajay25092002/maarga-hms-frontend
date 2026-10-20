@@ -153,7 +153,7 @@ export default function PatientsList() {
       try {
         const API_BASE_URL =
           import.meta.env.VITE_API_BASE_URL ||
-          "http://localhost:8000";
+          "http://localhost:8001";
 
         const params = new URLSearchParams({
           page: String(page),
