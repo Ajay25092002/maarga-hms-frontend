@@ -200,7 +200,6 @@ export default function UserForm({
               }
               minLength={8}
               maxLength={20}
-              pattern="USR[0-9]{5,}"
               autoComplete="off"
               required
               placeholder="e.g. USR00105"
