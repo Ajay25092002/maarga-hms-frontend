@@ -484,7 +484,7 @@ export default function NurseBillDetails() {
                   Back to Nurse Bills
                 </button>
 
-                {bill && canAddServices && (
+                {bill && canAddServices && !bill.discharge_date && (
                   <button
                     type="button"
                     onClick={() => navigate(`/nurse/${billId}/edit`)}

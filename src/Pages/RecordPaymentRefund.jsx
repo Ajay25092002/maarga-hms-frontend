@@ -128,6 +128,7 @@ function normalizeBill(bill) {
     total_refunded: Number(bill.total_refunds ?? bill.total_refunded ?? 0),
     outstanding_amount: Number(bill.outstanding_amount ?? 0),
     bill_date: bill.bill_date ?? bill.created_at ?? null,
+    discharge_date: bill.discharge_date ?? null,
   };
 }
 
@@ -136,7 +137,16 @@ function getBillResults(data) {
     ? data
     : (data?.items ?? data?.results ?? data?.bills ?? data?.data ?? []);
   return Array.isArray(results)
-    ? results.map(normalizeBill).filter((bill) => bill.id != null && bill.total_amount > 0 && bill.total_paid >= bill.total_amount && bill.total_refunded <= 0)
+    ? results
+        .map(normalizeBill)
+        .filter(
+          (bill) =>
+            bill.id != null &&
+            bill.total_amount > 0 &&
+            bill.total_paid >= bill.total_amount &&
+            bill.total_refunded <= 0 &&
+            (bill.bill_type !== "IP" || Boolean(bill.discharge_date)),
+        )
     : [];
 }
 

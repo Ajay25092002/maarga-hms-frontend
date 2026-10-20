@@ -127,13 +127,6 @@ function BillEditScreen({ expectedType }) {
         setLoading(true);
 
         const b = await api(`/api/bills/${billId}`);
-        // Prevent editing OP/IP bills if any payment exists.
-        const hasPayments =
-          b.has_payments === true ||
-          (Array.isArray(b.payments) && b.payments.length > 0);
-
-
-
         const list = await api(
           `/api/services?bill_type=${b.bill_type}&is_active=true&page=1&page_size=100`,
         );
@@ -144,6 +137,15 @@ function BillEditScreen({ expectedType }) {
           throw new Error(
             `This is not an ${expectedType} bill. Please open the ${expectedType} bill edit screen.`,
           );
+        }
+        if (expectedType === "OP") {
+          const outstanding = Number(
+            b.outstanding_amount ??
+              Math.max(0, Number(b.total_amount || 0) - Number(b.total_payments ?? b.total_paid ?? 0)),
+          );
+          if (outstanding <= 0) {
+            throw new Error("This OP bill is fully paid and can no longer be edited.");
+          }
         }
         setBill(b);
 

@@ -20,6 +20,7 @@ import { useTheme } from "../Context/ThemeContext";
 
 import { useToast } from "../Components/Common/useToast";
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+import ConfirmDialog from "../Components/Common/ConfirmDialog";
 
 const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -111,6 +112,8 @@ function BillEditScreen({ expectedType }) {
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
+  const [pendingDischargeDate, setPendingDischargeDate] = useState("");
+  const [confirmDischargeOpen, setConfirmDischargeOpen] = useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -143,6 +146,9 @@ function BillEditScreen({ expectedType }) {
           throw new Error(
             `This is not an ${expectedType} bill. Please open the ${expectedType} bill edit screen.`,
           );
+        }
+        if (expectedType === "IP" && b.discharge_date) {
+          throw new Error("This IP bill has a discharge date and can no longer be edited.");
         }
 
         setBill(b);
@@ -644,7 +650,15 @@ function BillEditScreen({ expectedType }) {
                         max={today()}
                         min={dateOnly(bill.admission_date) || undefined}
                         value={dateOnly(bill.discharge_date)}
-                        onChange={(event) => setBill((current) => ({ ...current, discharge_date: event.target.value || null }))}
+                        onChange={(event) => {
+                          const nextDate = event.target.value || "";
+                          if (nextDate && !bill.discharge_date) {
+                            setPendingDischargeDate(nextDate);
+                            setConfirmDischargeOpen(true);
+                            return;
+                          }
+                          setBill((current) => ({ ...current, discharge_date: nextDate || null }));
+                        }}
                         className={input}
                       />
                     </div>
@@ -988,6 +1002,23 @@ function BillEditScreen({ expectedType }) {
           )}
         </main>
       </div>
+      <ConfirmDialog
+        isOpen={confirmDischargeOpen}
+        title="Confirm patient discharge"
+        description="Are you sure you want to record this discharge date? Once the discharge date is saved, this IP bill cannot be edited again and nurses will no longer be able to add services."
+        variant="warning"
+        confirmText="Confirm Discharge"
+        cancelText="Go Back"
+        onConfirm={() => {
+          setBill((current) => ({ ...current, discharge_date: pendingDischargeDate || null }));
+          setPendingDischargeDate("");
+          setConfirmDischargeOpen(false);
+        }}
+        onCancel={() => {
+          setPendingDischargeDate("");
+          setConfirmDischargeOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -550,7 +550,7 @@ export default function OPBillDetails() {
                   Back to OP Bills
                 </button>
 
-                {bill && (
+                {bill && outstanding > 0 && (
                   <button
                     type="button"
                     onClick={() => navigate(`/op-billing/${billId}/edit`)}

@@ -563,7 +563,7 @@ export default function IPBillDetails() {
                   Back to IP Bills
                 </button>
 
-                {bill && (
+                {bill && !bill.discharge_date && (
                   <button
                     type="button"
                     onClick={() => navigate(`/ip-billing/${billId}/edit`)}

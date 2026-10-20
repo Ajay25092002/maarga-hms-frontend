@@ -198,6 +198,9 @@ export default function NurseEditIPBill() {
         if (String(billData.bill_type || "").toUpperCase() !== "IP") {
           throw new Error("Nurses can only access inpatient bills.");
         }
+        if (billData.discharge_date) {
+          throw new Error("Services cannot be added because this IP bill has already been discharged.");
+        }
 
         setBill(billData);
       } catch (err) {
