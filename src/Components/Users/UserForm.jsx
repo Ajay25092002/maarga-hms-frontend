@@ -112,9 +112,11 @@ export default function UserForm({
     event.preventDefault();
     setValidationError("");
 
-    if (!/^USR[0-9]{5,}$/.test(form.login_id.trim().toUpperCase())) {
+    const loginId = form.login_id.trim();
+
+    if (!loginId || loginId.length > 50) {
       setValidationError(
-        "Enter a valid User ID, for example USR00105 (USR followed by at least five digits)."
+        "User ID is required and must not exceed 50 characters."
       );
       return;
     }
