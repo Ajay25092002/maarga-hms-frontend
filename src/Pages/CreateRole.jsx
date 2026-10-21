@@ -37,6 +37,10 @@ const GROUPS = [
     keys: ["nurse.view", "nurse.add_services"],
   },
   {
+    title: "Nurse Service Group Access",
+    keys: ["nurse.all_service_groups"],
+  },
+  {
     title: "Payments & Receipts",
     keys: ["payments.view", "payments.create"],
   },

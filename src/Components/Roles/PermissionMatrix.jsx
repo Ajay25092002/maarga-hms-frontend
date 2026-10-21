@@ -19,6 +19,7 @@ const actionLabels = {
   create: "Create",
   edit: "Edit",
   add_services: "Add Services",
+  all_service_groups: "Allow All IP Service Groups (Nurse)",
   delete: "Delete",
   manage: "Manage",
 };

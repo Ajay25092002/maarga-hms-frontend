@@ -13,7 +13,9 @@ import {
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+import { useToast } from "../Components/Common/useToast";
 import { useTheme } from "../Context/ThemeContext";
+import { useAuth } from "../Context/AuthContext";
 
 const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -88,15 +90,17 @@ const getBillTotal = (bill) => {
 /** Only these service groups may be added by nurses to IP bills. */
 const ALLOWED_NURSE_SERVICE_GROUPS = [
   "CLINICAL SERVICES",
+  "MEDICAL EQUIPMENT",
   "MEDICAL EQUIPMENTS",
   "PROCEDURE",
+  "PROCEDURES",
   "PSYCHIATRY CHARGES",
   "RADIOLOGY CHARGES",
   "PATHOLOGY CHARGES",
 ];
 
 /** Build a query for active services available for inpatient billing. */
-const buildServiceQuery = ({ search = "", page = 1, pageSize = 100 } = {}) => {
+const buildServiceQuery = ({ search = "", page = 1, pageSize = 100, allowAllServiceGroups = false } = {}) => {
   const params = new URLSearchParams();
   params.set("bill_type", "IP");
   params.set("is_active", "true");
@@ -105,11 +109,13 @@ const buildServiceQuery = ({ search = "", page = 1, pageSize = 100 } = {}) => {
 
   if (search.trim()) params.set("search", search.trim());
 
-  // Keep the API query narrow where supported; frontend filtering below is authoritative
-  // for what appears in this dropdown.
-  ALLOWED_NURSE_SERVICE_GROUPS.forEach((group) => {
-    params.append("service_group", group);
-  });
+  // Restricted roles request the existing permitted groups. Roles with the new
+  // permission can search all eligible IP service groups.
+  if (!allowAllServiceGroups) {
+    ALLOWED_NURSE_SERVICE_GROUPS.forEach((group) => {
+      params.append("service_group", group);
+    });
+  }
 
   return `/api/services?${params.toString()}`;
 };
@@ -155,7 +161,10 @@ export default function NurseEditIPBill() {
   const { billId } = useParams();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const dark = theme === "dark";
+  const allowAllServiceGroups = user?.permissions?.["nurse.all_service_groups"] === true;
 
   const [bill, setBill] = useState(null);
   const [staged, setStaged] = useState([]);
@@ -167,7 +176,6 @@ export default function NurseEditIPBill() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [error, setError] = useState("");
 
   const text = dark ? "text-slate-100" : "text-slate-800";
   const muted = dark ? "text-slate-400" : "text-slate-500";
@@ -186,8 +194,6 @@ export default function NurseEditIPBill() {
 
     async function load() {
       setLoading(true);
-      setError("");
-
       try {
         const billData = await request(
           `/api/bills/${encodeURIComponent(billId)}`,
@@ -205,7 +211,11 @@ export default function NurseEditIPBill() {
         setBill(billData);
       } catch (err) {
         if (active) {
-          setError(err.message || "Unable to load the IP bill.");
+          showToast({
+            type: "error",
+            title: "Unable to open bill",
+            message: err.message || "Unable to load the IP bill.",
+          });
         }
       } finally {
         if (active) setLoading(false);
@@ -217,18 +227,26 @@ export default function NurseEditIPBill() {
     return () => {
       active = false;
     };
-  }, [billId]);
+  }, [billId, showToast]);
 
   const existingItems = bill?.items || [];
 
-  // Only show active IP services belonging to one of the six permitted groups.
-  // This frontend filter works even if the services API ignores service_group parameters.
+  // The UI mirrors the role permission, but the backend independently validates
+  // every submitted service. Keep the legacy six-group filter as the default.
   const fetchServices = async (search = "") => {
     const data = await request(
-      buildServiceQuery({ search, page: 1, pageSize: 100 }),
+      buildServiceQuery({
+        search,
+        page: 1,
+        pageSize: 100,
+        allowAllServiceGroups,
+      }),
     );
 
-    return extractServices(data).filter((service) =>
+    const services = extractServices(data);
+    if (allowAllServiceGroups) return services;
+
+    return services.filter((service) =>
       ALLOWED_NURSE_SERVICE_GROUPS.includes(
         normalizeGroup(groupName(service)),
       ),
@@ -251,33 +269,30 @@ export default function NurseEditIPBill() {
 
   const handleServiceChange = (service) => {
     setSelectedService(service || null);
-    setError("");
   };
 
   const addService = async () => {
-    setError("");
-
     if (!selectedService) {
-      setError("Please select a service.");
+      showToast({ type: "warning", message: "Please select a service." });
       return;
     }
 
     const qty = Number(quantity);
 
     if (!Number.isFinite(qty) || qty <= 0) {
-      setError("Quantity must be greater than zero.");
+      showToast({ type: "warning", message: "Quantity must be greater than zero." });
       return;
     }
 
     if (!serviceDate || serviceDate > today()) {
-      setError("Select a valid service date that is not in the future.");
+      showToast({ type: "warning", message: "Select a valid service date that is not in the future." });
       return;
     }
 
     const id = serviceId(selectedService);
 
     if (id === undefined || id === null || id === "") {
-      setError("The selected service has no valid ID.");
+      showToast({ type: "error", message: "The selected service has no valid ID." });
       return;
     }
 
@@ -317,6 +332,11 @@ export default function NurseEditIPBill() {
     } catch (err) {
       // Preserve the existing catalogue-rate fallback.
       console.warn("Unable to resolve service price:", err.message);
+      showToast({
+        type: "warning",
+        title: "Price lookup unavailable",
+        message: "The service price could not be refreshed. The catalogue rate will be used.",
+      });
     }
 
     setStaged((current) => [
@@ -335,17 +355,20 @@ export default function NurseEditIPBill() {
     setSelectedService(null);
     setQuantity("1");
     setServiceDate(today());
+    showToast({
+      type: "success",
+      message: `${serviceName(selectedService)} added to the pending services list.`,
+    });
   };
 
   const removeStagedService = (key) => {
     setStaged((current) => current.filter((item) => item.key !== key));
+    showToast({ type: "info", message: "Service removed from the pending list." });
   };
 
   const save = async () => {
-    setError("");
-
     if (!staged.length) {
-      setError("Add at least one new service before saving.");
+      showToast({ type: "warning", message: "Add at least one new service before saving." });
       return;
     }
 
@@ -369,14 +392,22 @@ export default function NurseEditIPBill() {
         );
       }
 
+      showToast({
+        type: "success",
+        title: "Services saved",
+        message: `${staged.length} new service${staged.length === 1 ? "" : "s"} added to the IP bill successfully.`,
+      });
       navigate(`/nurse/${encodeURIComponent(billId)}`, {
         replace: true,
         state: { nurseUpdateSuccess: true },
       });
     } catch (err) {
-      setError(
-        `${err.message || "Unable to save the new services."} If some services were saved before the error, reopen the bill and check its latest contents.`,
-      );
+      showToast({
+        type: "error",
+        title: "Unable to save services",
+        message: `${err.message || "Unable to save the new services."} If some services were saved before the error, reopen the bill and check its latest contents.`,
+        duration: 7000,
+      });
     } finally {
       setSaving(false);
     }
@@ -423,15 +454,6 @@ export default function NurseEditIPBill() {
               Back to Bill
             </button>
           </div>
-
-          {error && (
-            <div
-              role="alert"
-              className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            >
-              {error}
-            </div>
-          )}
 
           {loading ? (
             <section
@@ -622,8 +644,9 @@ export default function NurseEditIPBill() {
                 </h2>
 
                 <p className={`mb-4 mt-1 text-xs ${muted}`}>
-                  Search services from the six permitted IP service groups. Existing
-                  services cannot be changed here.
+                  {allowAllServiceGroups
+                    ? "Search services from any eligible IP service group. Existing services cannot be changed here."
+                    : "Search services from the six permitted IP service groups. Existing services cannot be changed here."}
                 </p>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -639,13 +662,17 @@ export default function NurseEditIPBill() {
                         try {
                           return await fetchServices(String(search || ""));
                         } catch (err) {
-                          setError(err.message || "Unable to load services.");
+                          showToast({
+                            type: "error",
+                            title: "Unable to load services",
+                            message: err.message || "Unable to load services.",
+                          });
                           return [];
                         }
                       }}
                       getOptionLabel={(service) => serviceName(service)}
                       getOptionValue={(service) => serviceId(service)}
-                      placeholder="Search permitted IP services"
+                      placeholder={allowAllServiceGroups ? "Search all eligible IP services" : "Search permitted IP services"}
                       searchPlaceholder="Search services..."
                       emptyMessage="No services found"
                       loadingMessage="Loading services..."
@@ -808,13 +835,7 @@ export default function NurseEditIPBill() {
                 </div>
               </section>
             </>
-          ) : (
-            <section
-              className={`rounded-lg border p-6 ${border} ${panel} ${muted}`}
-            >
-              Unable to load the IP bill.
-            </section>
-          )}
+          ) : null}
         </main>
       </div>
     </div>

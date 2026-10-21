@@ -4,6 +4,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./Pages/Login";
 import ForgotPassword from "./Pages/ForgotPassword";
 import Dashboard from "./Pages/Dashboard";
+import DashboardGate from "./Pages/DashboardGate";
+
 
 import PatientRegistration from "./Pages/PatientRegistration";
 import Patients from "./Pages/Patients";
@@ -54,12 +56,13 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/403" element={<AccessDenied />} />
 
+      
       {/* Dashboard */}
       <Route
         path="/"
         element={
-          <ProtectedRoute permission="dashboard.view">
-            <Dashboard />
+          <ProtectedRoute>
+            <DashboardGate />
           </ProtectedRoute>
         }
       />
@@ -67,11 +70,12 @@ export default function App() {
       <Route
         path="/home"
         element={
-          <ProtectedRoute permission="dashboard.view">
-            <Dashboard />
+          <ProtectedRoute>
+            <DashboardGate />
           </ProtectedRoute>
         }
       />
+
 
       {/* Patient management */}
       <Route

@@ -42,7 +42,7 @@ const GROUPS = [
   },
   {
     title: "Nurse",
-    keys: ["nurse.view", "nurse.add_services"],
+    keys: ["nurse.view", "nurse.add_services", "nurse.all_service_groups"],
   },
   {
     title: "Payments & Receipts",

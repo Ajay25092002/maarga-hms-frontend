@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSidebarStore } from "../../Store";
 import {
   LayoutDashboard,
+  House,
   UserRoundPlus,
   Users,
   ReceiptText,
@@ -245,21 +246,42 @@ function SidebarContents({
   const location = useLocation();
   const { theme } = useTheme();
 
+  const hasDashboardPermission = hasPermission(
+    permissions,
+    "dashboard.view",
+  );
+
   const visibleGroups = useMemo(
     () =>
       groups
         .map((group) => ({
           ...group,
-          items: group.items.filter((item) =>
-            item.permissions
-              ? item.permissions.some((permission) =>
-                  hasPermission(permissions, permission),
-                )
-              : hasPermission(permissions, item.permission),
-          ),
+          items: group.items
+            .filter((item) => {
+              // Keep the workspace link available even without dashboard access.
+              if (item.path === "/home") return true;
+
+              return item.permissions
+                ? item.permissions.some((permission) =>
+                    hasPermission(permissions, permission),
+                  )
+                : hasPermission(permissions, item.permission);
+            })
+            .map((item) => {
+              // Show Home for users without dashboard.view permission.
+              if (item.path === "/home") {
+                return {
+                  ...item,
+                  label: hasDashboardPermission ? "Dashboard" : "Home",
+                  icon: hasDashboardPermission ? LayoutDashboard : House,
+                };
+              }
+
+              return item;
+            }),
         }))
         .filter((group) => group.items.length > 0),
-    [permissions],
+    [permissions, hasDashboardPermission],
   );
 
   const visibleSettings = useMemo(
