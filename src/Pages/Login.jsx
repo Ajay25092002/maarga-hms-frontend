@@ -34,6 +34,7 @@ const handleSubmit = async (e) => {
     setError("Please enter your User ID and password.");
     return;
   }
+  
 
   setIsLoading(true);
 
@@ -143,7 +144,7 @@ const handleSubmit = async (e) => {
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value.toUpperCase())}
                   required
-                  minLength={8}
+                  minLength={6}
                   maxLength={20}
                   autoCapitalize="characters"
                   disabled={isLoading}
