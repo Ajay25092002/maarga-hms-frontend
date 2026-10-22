@@ -2,8 +2,7 @@ import React from "react";
 
 const GROUPS = [
   { title: "Dashboard", prefix: "dashboard." },
-  { title: "OP Patient Registration", prefix: "patients.op." },
-  { title: "IP Patients", prefix: "patients.ip." },
+  { title: "Patients", prefix: "patients." },
   { title: "OP Billing", prefix: "bills.op." },
   { title: "IP Billing", prefix: "bills.ip." },
   { title: "Nurse", prefix: "nurse." },

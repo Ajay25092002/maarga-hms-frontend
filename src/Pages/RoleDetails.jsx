@@ -25,20 +25,16 @@ const GROUPS = [
     keys: ["dashboard.view"],
   },
   {
-    title: "OP Patients",
-    keys: ["patients.op.view", "patients.op.create", "patients.op.edit"],
-  },
-  {
-    title: "IP Patients",
-    keys: ["patients.ip.view", "patients.ip.create", "patients.ip.edit"],
+    title: "Patients",
+    keys: ["patients.view", "patients.create", "patients.edit"],
   },
   {
     title: "OP Bills",
-    keys: ["bills.op.view", "bills.op.create","bills.op.edit"],
+    keys: ["bills.op.view", "bills.op.create", "bills.op.edit"],
   },
   {
     title: "IP Bills",
-    keys: ["bills.ip.view", "bills.ip.create","bills.ip.edit"],
+    keys: ["bills.ip.view", "bills.ip.create", "bills.ip.edit"],
   },
   {
     title: "Nurse",
@@ -53,41 +49,6 @@ const GROUPS = [
     keys: ["refunds.view", "refunds.create"],
   },
   {
-    title: "Service Groups",
-    keys: [
-      "service_groups.view",
-      "service_groups.create",
-      "service_groups.edit",
-      "service_groups.delete",
-    ],
-  },
-  {
-    title: "Services",
-    keys: [
-      "services.view",
-      "services.create",
-      "services.edit",
-      "services.delete",
-    ],
-  },
-  {
-    title: "Pricing",
-    keys: ["pricing.view", "pricing.create", "pricing.edit", "pricing.delete"],
-  },
-  {
-    title: "Room Types",
-    keys: [
-      "room_types.view",
-      "room_types.create",
-      "room_types.edit",
-      "room_types.delete",
-    ],
-  },
-  {
-    title: "Doctors",
-    keys: ["doctors.view", "doctors.create", "doctors.edit", "doctors.delete"],
-  },
-  {
     title: "Reports",
     keys: ["reports.view", "reports.download"],
   },
@@ -98,6 +59,10 @@ const GROUPS = [
   {
     title: "Roles & Permissions",
     keys: ["roles.view", "roles.create", "roles.edit", "roles.delete"],
+  },
+  {
+    title: "Pricing",
+    keys: ["pricing.view", "pricing.create", "pricing.edit", "pricing.import"],
   },
 ];
 

@@ -81,7 +81,7 @@ export default function App() {
       <Route
         path="/patients"
         element={
-          <ProtectedRoute permission={["patients.op.view", "patients.ip.view"]}>
+          <ProtectedRoute permission="patients.view">
             <Patients />
           </ProtectedRoute>
         }
@@ -91,7 +91,7 @@ export default function App() {
         path="/patients/new"
         element={
           <ProtectedRoute
-            permission={["patients.op.create", "patients.ip.create"]}
+            permission="patients.create"
           >
             <PatientRegistration />
           </ProtectedRoute>
@@ -101,7 +101,7 @@ export default function App() {
       <Route
         path="/patients/:patientId/edit"
         element={
-          <ProtectedRoute permission={["patients.op.edit", "patients.ip.edit"]}>
+          <ProtectedRoute permission="patients.edit">
             <EditPatient />
           </ProtectedRoute>
         }

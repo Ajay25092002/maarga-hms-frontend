@@ -94,7 +94,7 @@ const groups = [
         label: "Patient Registration",
         path: "/patients/new",
         icon: UserRoundPlus,
-        permissions: ["patients.op.create", "patients.ip.create"],
+        permission: "patients.create",
 
         // Registration is active only on its exact route.
         isActive: (pathname) => pathname === "/patients/new",
@@ -103,7 +103,7 @@ const groups = [
         label: "Patient List",
         path: "/patients",
         icon: Users,
-        permissions: ["patients.op.view", "patients.ip.view"],
+        permission: "patients.view",
 
         // Patient list and patient detail/edit pages only.
         // Explicitly exclude the registration route.
