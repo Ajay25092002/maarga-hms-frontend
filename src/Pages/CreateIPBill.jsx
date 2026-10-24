@@ -34,31 +34,39 @@ const API_BASE_URL = (
 ).replace(/\/$/, "");
 
 const REQUIRED_IP_SERVICES = [
+  "ROOM RENT",
   "NURSING CHARGES",
-
   "HOLISTIC THERAPIES",
-
   "DIET & FOOD",
-
   "PSYCHIATRIC CONSULTATION/TREATMENT",
-
   "PSYCHOLOGIST COUNSELLING/TREATMENT",
-
   "RECREATION ACTVITIES/THERAPY",
-
   "DOCTOR CONSULTATION",
-
   "MRD CHARGES",
-
   "ADMISSION CHARGES",
 ];
 
-const today = () => new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-}).format(new Date());
+const AUTOMATED_IP_SERVICE_NAMES = new Set([
+  "ROOM RENT",
+  "HOLISTIC THERAPIES",
+  "DIET & FOOD",
+  "DOCTOR CONSULTATION",
+  "NURSING CHARGES",
+  "PSYCHIATRIC CONSULTATION/TREATMENT",
+  "PSYCHOLOGIST COUNSELLING/TREATMENT",
+  "RECREATION ACTVITIES/THERAPY",
+]);
+
+const today = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+
+    year: "numeric",
+
+    month: "2-digit",
+
+    day: "2-digit",
+  }).format(new Date());
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -295,10 +303,8 @@ export default function CreateIPBill() {
 
   const fetchIPServices = useCallback(
     async (groupId, search, { signal } = {}) => {
-      if (!groupId) return [];
-
       const params = new URLSearchParams({
-        service_group_id: String(groupId),
+        ...(groupId ? { service_group_id: String(groupId) } : {}),
 
         bill_type: "IP",
 
@@ -475,19 +481,26 @@ export default function CreateIPBill() {
 
   const removeCharge = (categoryId, chargeId) => {
     setCategories((current) =>
-      current.map((category) => {
-        if (category.id !== categoryId) return category;
+      current.flatMap((category) => {
+        if (category.id !== categoryId) return [category];
 
-        return {
-          ...category,
+        const remainingItems = category.items.filter(
+          (item) => item.id !== chargeId,
+        );
 
-          items:
-            category.items.length === 1
-              ? [createCharge()]
-              : category.items.filter((item) => item.id !== chargeId),
-        };
+        // Remove the category too when its final service row is deleted.
+
+        // This ensures the deleted row disappears from the single table
+
+        // instead of being replaced with a blank row.
+
+        if (remainingItems.length === 0) return [];
+
+        return [{ ...category, items: remainingItems }];
       }),
     );
+
+    setNotice("");
   };
 
   const updateCharge = (categoryId, chargeId, updates) => {
@@ -508,7 +521,135 @@ export default function CreateIPBill() {
     setNotice("");
   };
 
-  const resolvePrice = async (categoryId, chargeId, serviceId) => {
+  const handleServiceSelection = async (categoryId, chargeId, service) => {
+    const serviceId = service ? String(getId(service)) : "";
+
+    if (!serviceId) {
+      await resolvePrice(categoryId, chargeId, "");
+
+      return;
+    }
+
+    const serviceGroupId = String(
+      service.service_group_id ??
+        service.group_id ??
+        service.service_group?.id ??
+        service.group?.id ??
+        serviceGroups.find(
+          (group) =>
+            getName(group).trim().toLowerCase() ===
+            String(
+              service.service_group_name ??
+                service.group_name ??
+                service.service_group?.name ??
+                service.group?.name ??
+                "",
+            )
+              .trim()
+              .toLowerCase(),
+        )?.id ??
+        "",
+    );
+
+    setServices((current) => {
+      const byId = new Map(
+        current.map((entry) => [String(getId(entry)), entry]),
+      );
+
+      byId.set(serviceId, service);
+
+      return Array.from(byId.values());
+    });
+
+    if (!serviceGroupId) {
+      await resolvePrice(categoryId, chargeId, serviceId, service);
+
+      return;
+    }
+
+    const sourceCategory = categories.find(
+      (category) => category.id === categoryId,
+    );
+
+    if (!sourceCategory) return;
+
+    let targetCategoryId = categoryId;
+
+    let nextCategories = categories;
+
+    if (String(sourceCategory.service_group_id) !== serviceGroupId) {
+      const selectedItem = sourceCategory.items.find(
+        (item) => item.id === chargeId,
+      );
+
+      if (!selectedItem) return;
+
+      const targetCategory = categories.find(
+        (category) =>
+          category.id !== categoryId &&
+          String(category.service_group_id) === serviceGroupId,
+      );
+
+      if (sourceCategory.items.length === 1) {
+        nextCategories = categories.map((category) =>
+          category.id === sourceCategory.id
+            ? { ...category, service_group_id: serviceGroupId }
+            : category,
+        );
+      } else if (targetCategory) {
+        targetCategoryId = targetCategory.id;
+
+        nextCategories = categories.map((category) => {
+          if (category.id === sourceCategory.id) {
+            return {
+              ...category,
+              items: category.items.filter((item) => item.id !== chargeId),
+            };
+          }
+
+          if (category.id === targetCategory.id) {
+            return { ...category, items: [...category.items, selectedItem] };
+          }
+
+          return category;
+        });
+      } else {
+        const newCategory = {
+          ...createCategory(),
+
+          service_group_id: serviceGroupId,
+
+          items: [selectedItem],
+        };
+
+        targetCategoryId = newCategory.id;
+
+        nextCategories = categories
+
+          .map((category) =>
+            category.id === sourceCategory.id
+              ? {
+                  ...category,
+                  items: category.items.filter((item) => item.id !== chargeId),
+                }
+              : category,
+          )
+
+          .concat(newCategory);
+      }
+
+      setCategories(nextCategories);
+    }
+
+    await resolvePrice(targetCategoryId, chargeId, serviceId, service);
+  };
+
+  const resolvePrice = async (
+    categoryId,
+    chargeId,
+    serviceId,
+    serviceOverride = null,
+  ) => {
     if (!serviceId) {
       updateCharge(categoryId, chargeId, {
         service_id: "",
@@ -543,9 +684,9 @@ export default function CreateIPBill() {
       return;
     }
 
-    const service = services.find(
-      (item) => String(getId(item)) === String(serviceId),
-    );
+    const service =
+      serviceOverride ??
+      services.find((item) => String(getId(item)) === String(serviceId));
 
     updateCharge(categoryId, chargeId, {
       service_id: String(serviceId),
@@ -727,6 +868,8 @@ export default function CreateIPBill() {
                 return {
                   ...createCharge(),
 
+                  isAutomaticallyPopulated: true,
+
                   service_id: String(getId(service)),
 
                   description: getName(service),
@@ -746,6 +889,8 @@ export default function CreateIPBill() {
               } catch (error) {
                 return {
                   ...createCharge(),
+
+                  isAutomaticallyPopulated: true,
 
                   service_id: String(getId(service)),
 
@@ -956,6 +1101,17 @@ export default function CreateIPBill() {
     };
 
     if (!selectedPatient) return fail("Please select a registered patient.");
+    if (!department.trim()) {
+      return fail("Please enter the department.");
+    }
+
+    if (!doctorName.trim()) {
+      return fail("Please select a doctor.");
+    }
+
+    if (!bedNumber.trim()) {
+      return fail("Please enter the bed number.");
+    }
 
     if (!admissionDate || !billDate) {
       return fail("Please select the admission date and bill date.");
@@ -1044,6 +1200,14 @@ export default function CreateIPBill() {
             service_id: Number(item.service_id),
 
             service_date: item.service_date || billDate,
+
+            room_type_id: Number(roomTypeId),
+
+            room_type_name:
+              roomTypes.find((room) => String(room.id) === String(roomTypeId))
+                ?.name || null,
+
+            bed_number: bedNumber.trim() || null,
 
             quantity: Number(item.quantity),
 
@@ -1330,23 +1494,25 @@ export default function CreateIPBill() {
                   </div>
 
                   <div>
-                    <label className={labelClass}>Department</label>
+                    <label className={labelClass}>Department *</label>
 
                     <input
                       value={department}
                       onChange={(event) => setDepartment(event.target.value)}
                       placeholder="Department"
                       className={inputClass}
+                      required
                     />
                   </div>
 
                   <div>
-                    <label className={labelClass}>Doctor Name (optional)</label>
+                    <label className={labelClass}>Doctor Name *</label>
 
                     <select
                       value={doctorName}
                       onChange={(event) => setDoctorName(event.target.value)}
                       className={inputClass}
+                      required
                     >
                       <option value="">Select doctor</option>
 
@@ -1428,13 +1594,14 @@ export default function CreateIPBill() {
                   </div>
 
                   <div>
-                    <label className={labelClass}>Bed Number</label>
+                    <label className={labelClass}>Bed Number *</label>
 
                     <input
                       value={bedNumber}
                       onChange={(event) => setBedNumber(event.target.value)}
-                      placeholder="e.g. B-102"
+                      placeholder="e.g: 102"
                       className={inputClass}
+                      required
                     />
                   </div>
 
@@ -1448,18 +1615,18 @@ export default function CreateIPBill() {
                 </div>
               </section>
 
-              {/* Service groups and services */}
+              {/* Services: one table, matching the Edit IP Bill layout */}
 
               <section className={`border-b pb-6 ${border}`}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className={`text-sm font-semibold ${text}`}>
-                      Service Groups & Charges
+                      Services & Charges
                     </h2>
 
                     <p className={`mt-1 text-xs ${muted}`}>
-                      Add multiple groups. Each service dropdown only shows
-                      services belonging to its selected group.
+                      Select an IP service. Its service group and room-specific
+                      rate are populated automatically.
                     </p>
                   </div>
 
@@ -1468,397 +1635,321 @@ export default function CreateIPBill() {
                     onClick={addCategory}
                     className="inline-flex h-9 items-center gap-2 rounded-md bg-[#3E439C] px-3 text-sm font-medium text-white hover:bg-[#323780]"
                   >
-                    <Plus size={16} />
-                    Add Service Group
+                    <Plus size={15} /> Add Service
                   </button>
                 </div>
 
-                {categories.map((category, categoryIndex) => {
-                  const summary = categorySummaries.find(
-                    (item) => item.id === category.id,
-                  );
+                <div
+                  className={`w-full overflow-x-auto rounded-md border ${border}`}
+                >
+                  <table className="w-full min-w-[1450px] table-fixed text-sm">
+                    <colgroup>
+                      <col style={{ width: "150px" }} />
 
-                  return (
-                    <div
-                      key={category.id}
-                      className={`mb-5 rounded-lg border p-4 last:mb-0 sm:p-5 ${border} ${panel}`}
+                      <col style={{ width: "190px" }} />
+
+                      <col style={{ width: "330px" }} />
+
+                      <col style={{ width: "85px" }} />
+
+                      <col style={{ width: "110px" }} />
+
+                      <col style={{ width: "120px" }} />
+
+                      <col style={{ width: "115px" }} />
+
+                      <col style={{ width: "105px" }} />
+
+                      <col style={{ width: "120px" }} />
+
+                      <col style={{ width: "48px" }} />
+                    </colgroup>
+
+                    <thead
+                      className={
+                        dark
+                          ? "bg-slate-800/70 text-slate-300"
+                          : "bg-slate-50 text-slate-600"
+                      }
                     >
-                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <h3 className={`text-sm font-semibold ${text}`}>
-                          Service Group {categoryIndex + 1}
-                        </h3>
+                      <tr>
+                        <th className="px-3 py-3 text-left text-xs font-semibold">
+                          Service Date *
+                        </th>
 
-                        <button
-                          type="button"
-                          onClick={() => removeCategory(category.id)}
-                          disabled={categories.length === 1}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/30"
-                        >
-                          <Trash2 size={14} />
-                          Remove Group
-                        </button>
-                      </div>
+                        <th className="px-3 py-3 text-left text-xs font-semibold">
+                          Service Group
+                        </th>
 
-                      <div className="mb-5 grid grid-cols-1  gap-2 md:grid-cols-1">
-                        <div>
-                          <label className={labelClass}>Service Group *</label>
+                        <th className="px-3 py-3 text-left text-xs font-semibold">
+                          IP Service *
+                        </th>
 
-                          <select
-                            value={category.service_group_id}
-                            onChange={(event) => {
-                              updateCategory(category.id, {
-                                service_group_id: event.target.value,
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          Quantity
+                        </th>
 
-                                items: category.items.map((item) => ({
-                                  ...item,
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          Rate (₹)
+                        </th>
 
-                                  service_id: "",
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          Gross Amount
+                        </th>
 
-                                  description: "",
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          Discount (₹)
+                        </th>
 
-                                  rate: "",
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          GST (₹)
+                        </th>
 
-                                  gst_amount: "0",
+                        <th className="px-3 py-3 text-right text-xs font-semibold">
+                          Net Amount
+                        </th>
 
-                                  priceLoading: false,
+                        <th className="px-2 py-3" />
+                      </tr>
+                    </thead>
 
-                                  priceError: "",
-                                })),
-                              });
-                            }}
-                            className={inputClass}
-                            required
-                          >
-                            <option value="">Select service group</option>
+                    <tbody>
+                      {categories
+                        .flatMap((category) =>
+                          category.items.map((item) => ({ category, item })),
+                        )
+                        .map(({ category, item }, index) => {
+                          const isAutomatedIPService =
+                            Boolean(item.isAutomaticallyPopulated) &&
+                            AUTOMATED_IP_SERVICE_NAMES.has(
+                              String(item.description || "")
+                                .trim()
+                                .toUpperCase(),
+                            );
 
-                            {serviceGroups.map((group) => (
-                              <option key={getId(group)} value={getId(group)}>
-                                {getName(group)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                          const quantity = Math.max(
+                            0,
+                            Number(item.quantity) || 0,
+                          );
 
-                        <div className="flex ">
-                          <p className={`text-xs ${muted}`}>
-                            {category.service_group_id
-                              ? "Search to find an IP service in this group."
-                              : "Select a service group to search its services."}
-                          </p>
-                        </div>
-                      </div>
+                          const rate = Math.max(0, Number(item.rate) || 0);
 
-                      <div className="w-full min-w-0 overflow-hidden">
-                        <table className="w-full min-w-0 table-fixed border-collapse text-sm">
-                          <thead>
-                            <tr
-                              className={
-                                dark ? "bg-slate-800/70" : "bg-slate-50"
-                              }
-                            >
-                              <th
-                                className={`w-32 px-2 py-3 text-left font-medium ${muted}`}
+                          const gross = quantity * rate;
+
+                          const discount = Math.min(
+                            gross,
+                            Math.max(0, Number(item.discount_amount) || 0),
+                          );
+
+                          const gstEligible = isGstEligible(category, item);
+
+                          const gstAmount = gstEligible
+                            ? Math.max(0, Number(item.gst_amount) || 0)
+                            : 0;
+
+                          const netWithGst =
+                            Math.max(0, gross - discount) + gstAmount;
+
+                          const group = serviceGroups.find(
+                            (entry) =>
+                              String(getId(entry)) ===
+                              String(category.service_group_id),
+                          );
+
+                          return (
+                            <tr key={item.id} className={`border-t ${border}`}>
+                              <td className="px-3 py-2.5 align-middle">
+                                <input
+                                  type="date"
+                                  max={today()}
+                                  disabled={isAutomatedIPService}
+                                  value={item.service_date || today()}
+                                  onChange={(event) =>
+                                    updateCharge(category.id, item.id, {
+                                      service_date: event.target.value,
+                                    })
+                                  }
+                                  className={`${inputClass} w-full disabled:cursor-not-allowed disabled:opacity-60`}
+                                  aria-label={`Service date for item ${index + 1}`}
+                                  required
+                                />
+                              </td>
+
+                              <td
+                                className={`px-3 py-2.5 align-middle ${text}`}
                               >
-                                Service Date *
-                              </th>
-
-                              <th
-                                className={`w-[260px] px-2 py-3 text-left font-medium ${muted}`}
-                              >
-                                Service Name *
-                              </th>
-
-                              <th
-                                className={`w-20 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                Quantity
-                              </th>
-
-                              <th
-                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                Rate (₹)
-                              </th>
-
-                              <th
-                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                Amount
-                              </th>
-
-                              <th
-                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                Discount (₹)
-                              </th>
-
-                              <th
-                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                GST (₹)
-                              </th>
-
-                              <th
-                                className={`w-28 px-2 py-3 text-right font-medium ${muted}`}
-                              >
-                                Net Amount
-                              </th>
-
-                              <th className="w-12 px-2 py-3" />
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {category.items.map((item) => {
-                              const quantity = Math.max(
-                                0,
-
-                                Number(item.quantity) || 0,
-                              );
-
-                              const rate = Math.max(0, Number(item.rate) || 0);
-
-                              const gross = quantity * rate;
-
-                              const discount = Math.min(
-                                gross,
-
-                                Math.max(0, Number(item.discount_amount) || 0),
-                              );
-
-                              const net = Math.max(0, gross - discount);
-
-                              const gstEligible = isGstEligible(category, item);
-
-                              const gstAmount = gstEligible
-                                ? Math.max(0, Number(item.gst_amount) || 0)
-                                : 0;
-
-                              const netWithGst = net + gstAmount;
-
-                              return (
-                                <tr
-                                  key={item.id}
-                                  className={`border-t ${border}`}
+                                <div
+                                  className="truncate"
+                                  title={
+                                    getName(group) ||
+                                    "Auto-selected from service"
+                                  }
                                 >
-                                  <td className="min-w-0 px-2 py-3">
-                                    <input
-                                      type="date"
-                                      max={today()}
-                                      value={item.service_date || today()}
-                                      onChange={(event) =>
-                                        updateCharge(category.id, item.id, {
-                                          service_date: event.target.value,
-                                        })
-                                      }
-                                      className={`${inputClass} w-full min-w-0`}
-                                      required
-                                    />
-                                  </td>
+                                  {getName(group) || (
+                                    <span className={muted}>Auto-selected</span>
+                                  )}
+                                </div>
+                              </td>
 
-                                  <td className="min-w-0 overflow-hidden px-3 py-3">
-                                    <div className="w-full min-w-0 overflow-hidden">
-                                      <SearchableDropdown
-                                        value={
-                                          services.find(
-                                            (service) =>
-                                              String(getId(service)) ===
-                                              String(item.service_id),
-                                          ) ?? null
-                                        }
-                                        onChange={(service) =>
-                                          resolvePrice(
-                                            category.id,
+                              <td className="px-3 py-2.5 align-middle">
+                                <div className="min-w-0 overflow-hidden">
+                                  <SearchableDropdown
+                                    value={
+                                      services.find(
+                                        (service) =>
+                                          String(getId(service)) ===
+                                          String(item.service_id),
+                                      ) ?? null
+                                    }
+                                    onChange={(service) =>
+                                      handleServiceSelection(
+                                        category.id,
+                                        item.id,
+                                        service,
+                                      )
+                                    }
+                                    fetchOptions={(search, options) =>
+                                      fetchIPServices("", search, options)
+                                    }
+                                    getOptionLabel={getName}
+                                    getOptionValue={getId}
+                                    placeholder={
+                                      !roomTypeId
+                                        ? "Select room type first"
+                                        : "Select IP service"
+                                    }
+                                    searchPlaceholder="Search IP services..."
+                                    emptyMessage="No matching IP services found."
+                                    loadingMessage="Searching services..."
+                                    disabled={
+                                      !roomTypeId ||
+                                      item.priceLoading ||
+                                      isAutomatedIPService
+                                    }
+                                    minSearchLength={0}
+                                    className="w-full min-w-0"
+                                  />
+                                </div>
 
-                                            item.id,
-
-                                            service ? getId(service) : "",
-                                          )
-                                        }
-                                        fetchOptions={(search, options) =>
-                                          fetchIPServices(
-                                            category.service_group_id,
-
-                                            search,
-
-                                            options,
-                                          )
-                                        }
-                                        getOptionLabel={getName}
-                                        getOptionValue={getId}
-                                        placeholder={
-                                          !category.service_group_id
-                                            ? "Select group first"
-                                            : !roomTypeId
-                                              ? "Select room type first"
-                                              : "Select service"
-                                        }
-                                        searchPlaceholder="Search IP services..."
-                                        emptyMessage="No matching IP services found."
-                                        loadingMessage="Searching services..."
-                                        disabled={
-                                          !category.service_group_id ||
-                                          !roomTypeId ||
-                                          item.priceLoading
-                                        }
-                                        minSearchLength={0}
-                                        className="w-full min-w-0 py-0"
-                                      />
-                                    </div>
-
-                                    {item.priceLoading && (
-                                      <p
-                                        className={`mt-1 flex items-center gap-1 text-xs ${muted}`}
-                                      >
-                                        <RefreshCw
-                                          size={12}
-                                          className="animate-spin"
-                                        />
-                                        Fetching room-specific price...
-                                      </p>
-                                    )}
-
-                                    {item.priceError && (
-                                      <p className="mt-1 text-xs text-red-500">
-                                        {item.priceError}
-                                      </p>
-                                    )}
-                                  </td>
-
-                                  <td className="px-3 py-3">
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      value={item.quantity}
-                                      onChange={(event) =>
-                                        updateCharge(category.id, item.id, {
-                                          quantity: event.target.value,
-                                        })
-                                      }
-                                      className={`${inputClass} text-right`}
-                                      required
-                                    />
-                                  </td>
-
-                                  <td className="px-3 py-3">
-                                    <input
-                                      type="number"
-                                      value={item.rate}
-                                      readOnly
-                                      aria-readonly="true"
-                                      placeholder={
-                                        item.priceLoading ? "Loading..." : "—"
-                                      }
-                                      className={`${readOnlyClass} text-right`}
-                                      title="Rate is populated by the backend and cannot be edited."
-                                    />
-                                  </td>
-
-                                  <td
-                                    className={`px-3 py-3 text-right ${text}`}
+                                {item.priceLoading && (
+                                  <p
+                                    className={`mt-1 flex items-center gap-1 text-xs ${muted}`}
                                   >
-                                    {currency(gross)}
-                                  </td>
+                                    <RefreshCw
+                                      size={12}
+                                      className="animate-spin"
+                                    />{" "}
+                                    Fetching room-specific price...
+                                  </p>
+                                )}
 
-                                  <td className="px-3 py-3">
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max={gross}
-                                      step="0.01"
-                                      value={item.discount_amount}
-                                      onChange={(event) =>
-                                        updateCharge(category.id, item.id, {
-                                          discount_amount: event.target.value,
-                                        })
-                                      }
-                                      className={`${inputClass} text-right`}
-                                    />
-                                  </td>
+                                {item.priceError && (
+                                  <p className="mt-1 text-xs text-red-500">
+                                    {item.priceError}
+                                  </p>
+                                )}
+                              </td>
 
-                                  <td className="px-3 py-3">
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={item.gst_amount}
-                                      disabled={!gstEligible}
-                                      onChange={(event) =>
-                                        updateCharge(category.id, item.id, {
-                                          gst_amount: event.target.value,
-                                        })
-                                      }
-                                      className={`${inputClass} text-right disabled:cursor-not-allowed disabled:opacity-50`}
-                                      aria-label="GST amount"
-                                    />
-                                  </td>
+                              <td className="px-3 py-2.5 align-middle">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={item.quantity}
+                                  disabled={isAutomatedIPService}
+                                  onChange={(event) =>
+                                    updateCharge(category.id, item.id, {
+                                      quantity: event.target.value,
+                                    })
+                                  }
+                                  className={`${inputClass} text-right disabled:cursor-not-allowed disabled:opacity-60`}
+                                  required
+                                />
+                              </td>
 
-                                  <td
-                                    className={`px-3 py-3 text-right font-semibold ${text}`}
-                                  >
-                                    {currency(netWithGst)}
-                                  </td>
+                              <td className="px-3 py-2.5 align-middle">
+                                <input
+                                  type="number"
+                                  value={item.rate}
+                                  readOnly
+                                  aria-readonly="true"
+                                  placeholder={
+                                    item.priceLoading ? "Loading..." : "—"
+                                  }
+                                  className={`${readOnlyClass} text-right`}
+                                  title="Rate is populated by the backend and cannot be edited."
+                                />
+                              </td>
 
-                                  <td className="px-2 py-3 text-center">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        removeCharge(category.id, item.id)
-                                      }
-                                      title="Remove service"
-                                      aria-label="Remove service"
-                                      className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                                    >
-                                      <Trash2 size={15} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                              <td
+                                className={`px-3 py-2.5 text-right align-middle ${text}`}
+                              >
+                                {currency(gross)}
+                              </td>
 
-                      <button
-                        type="button"
-                        onClick={() => addCharge(category.id)}
-                        className={`mt-3 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium text-[#3E439C] hover:bg-[#F1F0FF] dark:text-[#D6D4FF] dark:hover:bg-[#292B49] ${border}`}
-                      >
-                        <Plus size={14} />
-                        Add Service
-                      </button>
+                              <td className="px-3 py-2.5 align-middle">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={gross}
+                                  step="0.01"
+                                  value={item.discount_amount}
+                                  onChange={(event) =>
+                                    updateCharge(category.id, item.id, {
+                                      discount_amount: event.target.value,
+                                    })
+                                  }
+                                  className={`${inputClass} text-right`}
+                                />
+                              </td>
 
-                      <div
-                        className={`mt-4 grid grid-cols-1 gap-3 rounded-md border p-3 sm:grid-cols-3 ${border}`}
-                      >
-                        <div>
-                          <p className={`text-xs ${muted}`}>Group Subtotal</p>
+                              <td className="px-3 py-2.5 align-middle">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.gst_amount}
+                                  disabled={!gstEligible}
+                                  onChange={(event) =>
+                                    updateCharge(category.id, item.id, {
+                                      gst_amount: event.target.value,
+                                    })
+                                  }
+                                  className={`${inputClass} text-right disabled:cursor-not-allowed disabled:opacity-50`}
+                                  aria-label="GST amount"
+                                />
+                              </td>
 
-                          <p className={`mt-1 text-sm font-semibold ${text}`}>
-                            {currency(summary?.subtotal || 0)}
-                          </p>
-                        </div>
+                              <td
+                                className={`px-3 py-2.5 text-right align-middle font-semibold ${text}`}
+                              >
+                                {currency(netWithGst)}
+                              </td>
 
-                        <div>
-                          <p className={`text-xs ${muted}`}>Group Discount</p>
-
-                          <p className="mt-1 text-sm font-semibold text-red-600 dark:text-red-400">
-                            − {currency(summary?.discount || 0)}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className={`text-xs ${muted}`}>Group Total</p>
-
-                          <p className="mt-1 text-sm font-bold text-[#3E439C] dark:text-[#B9B7FF]">
-                            {currency(summary?.total || 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                              <td className="px-2 py-2.5 text-center align-middle">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeCharge(category.id, item.id)
+                                  }
+                                  disabled={isAutomatedIPService}
+                                  title={
+                                    isAutomatedIPService
+                                      ? "Automatically populated service cannot be removed"
+                                      : "Remove service"
+                                  }
+                                  aria-label="Remove service"
+                                  className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-red-950/30"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
               </section>
 
               {/* Notes and bill summary */}
@@ -1902,7 +1993,20 @@ export default function CreateIPBill() {
                     <div className={`flex justify-between text-sm ${muted}`}>
                       <span>Service Groups</span>
 
-                      <span className={text}>{categories.length}</span>
+                      <span className={text}>
+                        {
+                          new Set(
+                            categories
+                              .filter((category) =>
+                                category.items.some((item) => item.service_id),
+                              )
+                              .map((category) =>
+                                String(category.service_group_id),
+                              )
+                              .filter(Boolean),
+                          ).size
+                        }
+                      </span>
                     </div>
 
                     <div className={`flex justify-between text-sm ${muted}`}>

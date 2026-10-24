@@ -134,6 +134,13 @@ const groups = [
           pathname === "/ip-billing" || pathname.startsWith("/ip-billing/"),
       },
       {
+        label: "Bill History",
+        path: "/bill-history",
+        icon: FileSpreadsheet,
+        permission: "bills.history.view",
+        isActive: (pathname) => pathname === "/bill-history" || pathname.startsWith("/bill-history/"),
+      },
+      {
         label: "Nurse",
         path: "/nurse",
         icon: BedDouble,

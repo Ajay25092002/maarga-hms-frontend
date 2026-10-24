@@ -5,6 +5,7 @@ const GROUPS = [
   { title: "Patients", prefix: "patients." },
   { title: "OP Billing", prefix: "bills.op." },
   { title: "IP Billing", prefix: "bills.ip." },
+  { title: "Bill History", prefix: "bills.history." },
   { title: "Nurse", prefix: "nurse." },
   { title: "Payments & Receipts", prefix: "payments." },
   { title: "Payment Refunds", prefix: "refunds." },

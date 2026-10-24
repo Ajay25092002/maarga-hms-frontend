@@ -142,6 +142,7 @@ export default function CreateOPBill() {
   const [doctorId, setDoctorId] = useState("");
   const [doctorName, setDoctorName] = useState("");
 
+  const [psychologistId, setPsychologistId] = useState("");
   const [psychologistName, setPsychologistName] = useState("");
 
   // Each service has its own quantity, rate and discount
@@ -704,6 +705,7 @@ export default function CreateOPBill() {
       doctor_id: Number(doctorId),
       doctor_name: doctorName.trim() || null,
 
+      psychologist_id: psychologistId ? Number(psychologistId) : null,
       psychologist_name: psychologistName.trim() || null,
 
       // Discounts are applied per service row.
@@ -1068,24 +1070,40 @@ export default function CreateOPBill() {
                     </select>
                   </div>
 
-                  {/* Psychologist name */}
+                  {/* Psychologist name — selected from the same professional master list */}
 
                   <div>
                     <label htmlFor="psychologistName" className={labelClass}>
                       Psychologist Name
                     </label>
-
-                    <input
+                    <select
                       id="psychologistName"
-                      type="text"
-                      value={psychologistName}
-                      onChange={(event) =>
-                        setPsychologistName(event.target.value)
-                      }
-                      placeholder="Enter psychologist's name"
-                      maxLength={150}
+                      value={psychologistId}
+                      onChange={(event) => {
+                        const selectedId = event.target.value;
+                        const selectedPsychologist = doctors.find(
+                          (record) => String(recordId(record)) === selectedId,
+                        );
+                        setPsychologistId(selectedId);
+                        setPsychologistName(recordName(selectedPsychologist));
+                      }}
                       className={inputClass}
-                    />
+                      disabled={mastersLoading}
+                    >
+                      <option value="">
+                        {mastersLoading
+                          ? "Loading psychologists..."
+                          : "Select psychologist (optional)"}
+                      </option>
+                      {doctors.map((psychologist) => (
+                        <option
+                          key={recordId(psychologist)}
+                          value={recordId(psychologist)}
+                        >
+                          {recordName(psychologist)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Rate Category */}

@@ -47,11 +47,16 @@ const formatDate = (value, includeTime = false) => {
   if (Number.isNaN(parsed.getTime())) return "—";
 
   const hasTime = typeof value === "string" && value.includes("T");
+
   return parsed.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
+
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
+
     ...(includeTime && hasTime
       ? { hour: "2-digit", minute: "2-digit", hour12: true }
       : {}),
@@ -118,7 +123,15 @@ const getStatus = (bill) => {
 
 
 
+
+
+
+
  * Resolves a service-group name from common API response shapes.
+
+
+
+
 
 
 
@@ -126,11 +139,23 @@ const getStatus = (bill) => {
 
 
 
+
+
+
+
  * If the API returns only a group ID, the backend must also return
 
 
 
+
+
+
+
  * the corresponding group name for the frontend to display it.
+
+
+
+
 
 
 
@@ -247,6 +272,9 @@ export default function IPBillDetails() {
   const dark = theme === "dark";
 
   const [bill, setBill] = useState(null);
+  const [roomHistory, setRoomHistory] = useState([]);
+  const [roomHistoryLoading, setRoomHistoryLoading] = useState(false);
+  const [roomHistoryError, setRoomHistoryError] = useState("");
 
   const [loading, setLoading] = useState(true);
 
@@ -255,10 +283,6 @@ export default function IPBillDetails() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [pdfLoading, setPdfLoading] = useState(false);
-
-
-
-  
 
   const border = dark ? "border-slate-700" : "border-slate-200";
 
@@ -345,6 +369,72 @@ export default function IPBillDetails() {
 
     return () => controller.abort();
   }, [loadBill, refreshKey]);
+
+  // Room history is fetched from its dedicated endpoint, separately from bill details.
+  useEffect(() => {
+    if (!billId) {
+      setRoomHistory([]);
+      setRoomHistoryError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    const loadRoomHistory = async () => {
+      setRoomHistoryLoading(true);
+      setRoomHistoryError("");
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/room-history`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          },
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            getErrorMessage(
+              data,
+              `Unable to load room history (HTTP ${response.status}).`,
+            ),
+          );
+        }
+
+        // Support either a plain array or a wrapped API response.
+        const records = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.room_history)
+            ? data.room_history
+            : Array.isArray(data?.history)
+              ? data.history
+              : [];
+
+        setRoomHistory(
+          [...records].sort((a, b) => {
+            const aTime = new Date(a?.start_at ?? a?.created_at ?? 0).getTime();
+            const bTime = new Date(b?.start_at ?? b?.created_at ?? 0).getTime();
+            return bTime - aTime;
+          }),
+        );
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Failed to load IP room history:", err);
+        setRoomHistory([]);
+        setRoomHistoryError(err.message || "Unable to load room history.");
+      } finally {
+        if (!controller.signal.aborted) setRoomHistoryLoading(false);
+      }
+    };
+
+    loadRoomHistory();
+    return () => controller.abort();
+  }, [billId, refreshKey]);
 
   const items = useMemo(
     () => (Array.isArray(bill?.items) ? bill.items : []),
@@ -695,11 +785,13 @@ export default function IPBillDetails() {
                     >
                       {status}
                     </span>
-                    {bill?.refund_status && bill.refund_status !== "Not Refunded" && (
-                      <span className="ml-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-                        {bill.refund_status}
-                      </span>
-                    )}
+
+                    {bill?.refund_status &&
+                      bill.refund_status !== "Not Refunded" && (
+                        <span className="ml-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                          {bill.refund_status}
+                        </span>
+                      )}
                   </div>
                 </header>
 
@@ -850,7 +942,7 @@ export default function IPBillDetails() {
                   <div
                     className={`overflow-x-auto rounded-lg border ${border}`}
                   >
-                    <table className="w-full min-w-[900px] border-collapse text-sm">
+                    <table className="w-full min-w-[1120px] border-collapse text-sm">
                       <thead>
                         <tr className={dark ? "bg-slate-800" : "bg-slate-50"}>
                           {[
@@ -861,6 +953,10 @@ export default function IPBillDetails() {
                             "Description",
 
                             "Service Date",
+
+                            "Room Type",
+
+                            "Bed",
 
                             "Qty",
 
@@ -904,7 +1000,7 @@ export default function IPBillDetails() {
                         {items.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={12}
                               className={`px-3 py-8 text-center text-sm ${muted}`}
                             >
                               No itemized charges are available.
@@ -959,6 +1055,18 @@ export default function IPBillDetails() {
                                   className={`border-b px-3 py-3 whitespace-nowrap ${border} ${text}`}
                                 >
                                   {formatDate(item?.service_date)}
+                                </td>
+
+                                <td
+                                  className={`border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {item?.room_type_name || "—"}
+                                </td>
+
+                                <td
+                                  className={`border-b px-3 py-3 whitespace-nowrap ${border} ${text}`}
+                                >
+                                  {item?.bed_number || "—"}
                                 </td>
 
                                 <td
@@ -1053,25 +1161,43 @@ export default function IPBillDetails() {
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm ${muted}`}>Total Payments Received</span>
+                    <span className={`text-sm ${muted}`}>
+                      Total Payments Received
+                    </span>
 
-                    <span className={`text-sm ${text}`}>{currency(totalPayments)}</span>
+                    <span className={`text-sm ${text}`}>
+                      {currency(totalPayments)}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Total Refunds</span>
-                    <span className="text-sm text-red-600 dark:text-red-400">− {currency(totalRefunds)}</span>
+
+                    <span className="text-sm text-red-600 dark:text-red-400">
+                      − {currency(totalRefunds)}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm ${muted}`}>Net Payments Retained</span>
-                    <span className={`text-sm font-semibold ${text}`}>{currency(Math.max(0, totalPayments - totalRefunds))}</span>
+                    <span className={`text-sm ${muted}`}>
+                      Net Payments Retained
+                    </span>
+
+                    <span className={`text-sm font-semibold ${text}`}>
+                      {currency(Math.max(0, totalPayments - totalRefunds))}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${muted}`}>Deposit Balance</span>
+
                     <span className={`text-sm font-semibold ${text}`}>
-                      {currency(Math.max(0, Math.max(0, totalPayments - totalRefunds) - total))}
+                      {currency(
+                        Math.max(
+                          0,
+                          Math.max(0, totalPayments - totalRefunds) - total,
+                        ),
+                      )}
                     </span>
                   </div>
 
@@ -1215,17 +1341,22 @@ export default function IPBillDetails() {
                     <div
                       className={`overflow-x-auto rounded-md border ${border}`}
                     >
-                      <table className="w-full min-w-[760px] border-collapse text-sm">
+                      <table className="w-full min-w-[640px] border-collapse text-sm">
                         <thead
                           className={dark ? "bg-slate-800" : "bg-slate-50"}
                         >
                           <tr>
                             {[
                               "Refund No.",
+
                               "Refund Date",
+
                               "Payment Receipt",
+
                               "Method",
+
                               "Reason",
+
                               "Refund Amount",
                             ].map((heading) => (
                               <th
@@ -1257,6 +1388,7 @@ export default function IPBillDetails() {
                               >
                                 {formatDate(
                                   refund?.created_at ?? refund?.refund_date,
+
                                   true,
                                 )}
                               </td>
@@ -1286,6 +1418,118 @@ export default function IPBillDetails() {
                               </td>
                             </tr>
                           ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  title="Room History"
+                  icon={BedDouble}
+                  dark={dark}
+                  border={border}
+                >
+                  {roomHistoryLoading ? (
+                    <p className={`text-sm ${muted}`} aria-live="polite">
+                      Loading room history...
+                    </p>
+                  ) : roomHistoryError ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        {roomHistoryError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setRefreshKey((current) => current + 1)}
+                        className="inline-flex h-9 items-center gap-2 rounded-md border border-[#3E439C] px-3 text-sm font-medium text-[#3E439C] dark:text-[#B9B7FF]"
+                      >
+                        <RefreshCw size={14} /> Retry
+                      </button>
+                    </div>
+                  ) : roomHistory.length === 0 ? (
+                    <p className={`text-sm ${muted}`}>
+                      No room changes have been recorded for this admission.
+                    </p>
+                  ) : (
+                    <div
+                      className={`overflow-x-auto rounded-md border ${border}`}
+                    >
+                      <table className="w-full min-w-[640px] border-collapse text-sm">
+                        <thead
+                          className={dark ? "bg-slate-800" : "bg-slate-50"}
+                        >
+                          <tr>
+                            {[
+                              "Room Type",
+                              "Bed Number",
+                              "Start Date & Time",
+                              "End Date & Time",
+                              "Updated By",
+                            ].map((heading) => (
+                              <th
+                                key={heading}
+                                className={`border-b px-3 py-3 text-left text-xs font-semibold ${border} ${muted}`}
+                              >
+                                {heading}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roomHistory.map((entry, index) => {
+                            const isCurrent = !entry?.end_at;
+                            return (
+                              <tr
+                                key={
+                                  entry?.id ??
+                                  `${entry?.start_at ?? "room"}-${index}`
+                                }
+                              >
+                                <td
+                                  className={`border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {displayValue(
+                                    entry?.room_type_name ??
+                                      entry?.room_type?.name ??
+                                      entry?.room_type,
+                                  )}
+                                </td>
+                                <td
+                                  className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {displayValue(entry?.bed_number)}
+                                </td>
+                                <td
+                                  className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {formatDate(
+                                    entry?.start_at ?? entry?.created_at,
+                                    true,
+                                  )}
+                                </td>
+                                <td
+                                  className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {isCurrent ? (
+                                    <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                      Current
+                                    </span>
+                                  ) : (
+                                    formatDate(entry?.end_at, true)
+                                  )}
+                                </td>
+                                <td
+                                  className={`border-b px-3 py-3 ${border} ${text}`}
+                                >
+                                  {displayValue(
+                                    entry?.changed_by_name,
+                                    "Unknown User",
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

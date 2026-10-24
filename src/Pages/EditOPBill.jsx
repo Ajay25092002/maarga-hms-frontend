@@ -19,30 +19,43 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 
 import { useToast } from "../Components/Common/useToast";
+
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
 
 const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
-const today = () => new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-}).format(new Date());
+const today = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+
+    year: "numeric",
+
+    month: "2-digit",
+
+    day: "2-digit",
+  }).format(new Date());
 
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : "");
 
 // Remove a field key from this array whenever it should become editable.
+
 const DISABLED_OP_EDIT_FIELDS = [
   "patient_search",
+
   "patient_id",
+
   "mobile_number",
+
   "patient_name",
+
   "bill_date",
+
   "doctor_name",
+
   "psychologist_name",
+
   "rate_category",
 ];
 
@@ -127,6 +140,7 @@ function BillEditScreen({ expectedType }) {
         setLoading(true);
 
         const b = await api(`/api/bills/${billId}`);
+
         const list = await api(
           `/api/services?bill_type=${b.bill_type}&is_active=true&page=1&page_size=100`,
         );
@@ -138,15 +152,24 @@ function BillEditScreen({ expectedType }) {
             `This is not an ${expectedType} bill. Please open the ${expectedType} bill edit screen.`,
           );
         }
+
         if (expectedType === "OP") {
           const outstanding = Number(
             b.outstanding_amount ??
-              Math.max(0, Number(b.total_amount || 0) - Number(b.total_payments ?? b.total_paid ?? 0)),
+              Math.max(
+                0,
+                Number(b.total_amount || 0) -
+                  Number(b.total_payments ?? b.total_paid ?? 0),
+              ),
           );
+
           if (outstanding <= 0) {
-            throw new Error("This OP bill is fully paid and can no longer be edited.");
+            throw new Error(
+              "This OP bill is fully paid and can no longer be edited.",
+            );
           }
         }
+
         setBill(b);
 
         setServices(
@@ -231,7 +254,7 @@ function BillEditScreen({ expectedType }) {
 
         service_name: "",
 
-        service_date: "",
+        service_date: today(),
 
         quantity: "1",
 
@@ -461,10 +484,14 @@ function BillEditScreen({ expectedType }) {
           ) : (
             bill && (
               <form onSubmit={save} className="space-y-5">
-                {/* Patient & Provider Details — editability controlled by DISABLED_OP_EDIT_FIELDS */}
+                {
+                  /* Patient & Provider Details — editability controlled by DISABLED_OP_EDIT_FIELDS */
+                }
+
                 <section className={`border-b pb-6 ${border}`}>
                   <div className="mb-4 flex items-center gap-2">
                     <UserRound size={17} className="text-[#3E439C]" />
+
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Patient & Provider Details
                     </h2>
@@ -475,8 +502,9 @@ function BillEditScreen({ expectedType }) {
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
-                        Search Patient *
+                        Search Patient \*
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_name || ""}
@@ -487,12 +515,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Patient ID / UHID
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_id || bill.uhid || ""}
@@ -503,12 +533,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Mobile Number
                       </label>
+
                       <input
                         type="text"
                         value={
@@ -524,12 +556,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Patient Name
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_name || ""}
@@ -540,17 +574,20 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
-                        Bill Date *
+                        Bill Date \*
                       </label>
+
                       <div className="relative">
                         <CalendarDays
                           size={16}
                           className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
                         />
+
                         <input
                           type="date"
                           value={dateOnly(bill.bill_date)}
@@ -561,12 +598,14 @@ function BillEditScreen({ expectedType }) {
                         />
                       </div>
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
-                        Doctor Name *
+                        Doctor Name \*
                       </label>
+
                       <input
                         type="text"
                         value={bill.doctor_name || ""}
@@ -577,12 +616,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Psychologist Name
                       </label>
+
                       <input
                         type="text"
                         value={bill.psychologist_name || ""}
@@ -593,12 +634,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Rate Category
                       </label>
+
                       <input
                         type="text"
                         value={bill.rate_category || "General OPD"}
@@ -612,17 +655,20 @@ function BillEditScreen({ expectedType }) {
                 </section>
 
                 {/* Services & Charges */}
+
                 <section>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className={`text-sm font-semibold ${text}`}>
                         Services & Charges
                       </h2>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         Select a service. The applicable rate is loaded
                         automatically.
                       </p>
                     </div>
+
                     <button
                       type="button"
                       onClick={addItem}
@@ -638,14 +684,22 @@ function BillEditScreen({ expectedType }) {
                     <table className="w-full min-w-[1200px] table-fixed text-sm">
                       <colgroup>
                         <col style={{ width: "185px" }} />
+
                         <col style={{ width: "370px" }} />
+
                         <col style={{ width: "90px" }} />
+
                         <col style={{ width: "110px" }} />
+
                         <col style={{ width: "130px" }} />
+
                         <col style={{ width: "120px" }} />
+
                         <col style={{ width: "130px" }} />
+
                         <col style={{ width: "48px" }} />
                       </colgroup>
+
                       <thead
                         className={
                           dark
@@ -657,43 +711,59 @@ function BillEditScreen({ expectedType }) {
                           <th className="px-3 py-3 text-left text-xs font-semibold">
                             Service Date
                           </th>
+
                           <th className="px-3 py-3 text-left text-xs font-semibold">
                             OP Service
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Quantity
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Rate (₹)
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Gross Amount
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Discount (₹)
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Net Amount
                           </th>
+
                           <th className="px-2 py-3" />
                         </tr>
                       </thead>
+
                       <tbody>
                         {items.map((item, index) => {
                           const quantity = Math.max(
                             0,
+
                             Number(item.quantity) || 0,
                           );
+
                           const rate = Math.max(0, Number(item.rate) || 0);
+
                           const gross = quantity * rate;
+
                           const discount = Math.max(
                             0,
+
                             Number(item.discount_amount) || 0,
                           );
+
                           const net = Math.max(
                             0,
+
                             gross - discount + (Number(item.gst_amount) || 0),
                           );
+
                           return (
                             <tr key={item.key} className={`border-t ${border}`}>
                               <td className="px-3 py-2.5 align-middle">
@@ -711,6 +781,7 @@ function BillEditScreen({ expectedType }) {
                                   required
                                 />
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <div className="min-w-0 overflow-hidden">
                                   <SearchableDropdown
@@ -723,6 +794,7 @@ function BillEditScreen({ expectedType }) {
                                       (item.service_id
                                         ? {
                                             id: item.service_id,
+
                                             name: item.service_name,
                                           }
                                         : null)
@@ -730,6 +802,7 @@ function BillEditScreen({ expectedType }) {
                                     onChange={(service) =>
                                       selectService(
                                         item.key,
+
                                         service
                                           ? String(
                                               service.id ?? service.service_id,
@@ -741,6 +814,7 @@ function BillEditScreen({ expectedType }) {
                                       services.filter((s) =>
                                         String(s.name ?? s.service_name ?? "")
                                           .toLowerCase()
+
                                           .includes(
                                             String(search ?? "").toLowerCase(),
                                           ),
@@ -758,17 +832,20 @@ function BillEditScreen({ expectedType }) {
                                     className="w-full min-w-0"
                                   />
                                 </div>
+
                                 {item.priceLoading && (
                                   <p className={`mt-1 text-xs ${muted}`}>
                                     Loading applicable price…
                                   </p>
                                 )}
+
                                 {item.priceError && (
                                   <p className="mt-1 text-xs text-red-500">
                                     {item.priceError}
                                   </p>
                                 )}
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="number"
@@ -785,6 +862,7 @@ function BillEditScreen({ expectedType }) {
                                   required
                                 />
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <div
                                   className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
@@ -796,6 +874,7 @@ function BillEditScreen({ expectedType }) {
                                   </span>
                                 </div>
                               </td>
+
                               <td
                                 className={`px-3 py-2.5 text-right align-middle ${muted}`}
                               >
@@ -803,6 +882,7 @@ function BillEditScreen({ expectedType }) {
                                   {money(gross)}
                                 </span>
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="number"
@@ -818,6 +898,7 @@ function BillEditScreen({ expectedType }) {
                                   aria-label={`Discount for item ${index + 1}`}
                                 />
                               </td>
+
                               <td
                                 className={`px-3 py-2.5 text-right align-middle font-semibold ${text}`}
                               >
@@ -825,6 +906,7 @@ function BillEditScreen({ expectedType }) {
                                   {money(net)}
                                 </span>
                               </td>
+
                               <td className="px-2 py-2.5 text-center align-middle">
                                 <button
                                   type="button"
@@ -847,6 +929,42 @@ function BillEditScreen({ expectedType }) {
                     </table>
                   </div>
                 </section>
+
+                {expectedType === "OP" && (
+                  <section
+                    className={`rounded-lg border p-4 ${border} ${panel}`}
+                  >
+                    <div className="mb-3 flex items-center gap-2">
+                      <Save size={16} className="text-[#3E439C]" />
+                      <h2 className={`text-sm font-semibold ${text}`}>
+                        Billing Notes
+                      </h2>
+                    </div>
+                    <label
+                      htmlFor="billing-notes"
+                      className={`mb-2 block text-sm font-medium ${text}`}
+                    >
+                      Notes (optional)
+                    </label>
+                    <textarea
+                      id="billing-notes"
+                      rows={4}
+                      value={bill.notes || ""}
+                      onChange={(e) =>
+                        setBill((current) => ({
+                          ...current,
+                          notes: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter additional billing notes"
+                      className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none focus:border-[#3E439C] ${
+                        dark
+                          ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
+                          : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+                      }`}
+                    />
+                  </section>
+                )}
 
                 <section className={`rounded-lg border p-4 ${border} ${panel}`}>
                   <div

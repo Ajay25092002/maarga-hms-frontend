@@ -10,6 +10,7 @@ import {
   RefreshCw,
   UserRound,
   CalendarDays,
+  FileText,
 } from "lucide-react";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
@@ -19,36 +20,77 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 
 import { useToast } from "../Components/Common/useToast";
+
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+
 import ConfirmDialog from "../Components/Common/ConfirmDialog";
 
 const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
-const today = () => new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-}).format(new Date());
+const today = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+
+    year: "numeric",
+
+    month: "2-digit",
+
+    day: "2-digit",
+  }).format(new Date());
 
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : "");
 
 // Remove a field key from this array whenever it should become editable.
+
 const DISABLED_IP_EDIT_FIELDS = [
-  // Remove a key from this array whenever that field should become editable.
   "patient_search",
+
   "patient_id",
+
   "mobile_number",
+
   "patient_name",
+
   "bill_date",
+
   "doctor_name",
+
   "psychologist_name",
+
   "rate_category",
-  "room_type_id",
-  "bed_number",
 ];
+
+/**
+
+ * IP services automatically added by the billing scheduler.
+
+ * Quantity is read-only for these service names on the IP bill edit screen.
+
+ */
+
+const AUTOMATED_IP_SERVICE_NAMES = new Set([
+  "room rent",
+
+  "holistic therapies",
+
+  "diet & food",
+
+  "doctor consultation",
+
+  "nursing charges",
+
+  "psychiatric consultation/treatment",
+
+  "psychologist counselling/treatment",
+
+  "recreation actvities/therapy",
+
+  // Also accept the correctly spelled version if the service name is corrected.
+
+  "recreation activities/therapy",
+]);
 
 const money = (v) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
@@ -105,6 +147,8 @@ function BillEditScreen({ expectedType }) {
 
   const [services, setServices] = useState([]);
 
+  const [roomTypes, setRoomTypes] = useState([]);
+
   const [items, setItems] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -112,7 +156,9 @@ function BillEditScreen({ expectedType }) {
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
+
   const [pendingDischargeDate, setPendingDischargeDate] = useState("");
+
   const [confirmDischargeOpen, setConfirmDischargeOpen] = useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
@@ -134,7 +180,14 @@ function BillEditScreen({ expectedType }) {
 
         const b = await api(`/api/bills/${billId}`);
 
+        const roomTypesData =
+          String(b.bill_type).toUpperCase() === "IP"
+            ? await api("/api/room-types")
+            : [];
 
+        const availableRoomTypes = Array.isArray(roomTypesData)
+          ? roomTypesData
+          : roomTypesData.items || roomTypesData.results || [];
 
         const list = await api(
           `/api/services?bill_type=${b.bill_type}&is_active=true&page=1&page_size=100`,
@@ -142,13 +195,20 @@ function BillEditScreen({ expectedType }) {
 
         if (!active) return;
 
+        setRoomTypes(
+          availableRoomTypes.filter((room) => room.is_active !== false),
+        );
+
         if (String(b.bill_type || "").toUpperCase() !== expectedType) {
           throw new Error(
             `This is not an ${expectedType} bill. Please open the ${expectedType} bill edit screen.`,
           );
         }
+
         if (expectedType === "IP" && b.discharge_date) {
-          throw new Error("This IP bill has a discharge date and can no longer be edited.");
+          throw new Error(
+            "This IP bill has a discharge date and can no longer be edited.",
+          );
         }
 
         setBill(b);
@@ -160,13 +220,33 @@ function BillEditScreen({ expectedType }) {
         setItems(
           (b.items || []).map((x) => ({
             key: makeKey(),
+
             service_id: String(x.service_id),
+
             service_name: x.service_name || x.name || "",
+
+            isAutomaticallyPopulated: AUTOMATED_IP_SERVICE_NAMES.has(
+              String(x.service_name || x.name || "")
+                .trim()
+                .toLowerCase(),
+            ),
+
             service_date: dateOnly(x.service_date),
+
+            room_type_id: String(x.room_type_id ?? b.room_type_id ?? ""),
+
+            room_type_name: x.room_type_name || b.room_type_name || "",
+
+            bed_number: x.bed_number ?? b.bed_number ?? "",
+
             quantity: String(x.quantity ?? 1),
+
             discount_amount: String(x.discount_amount ?? 0),
+
             gst_amount: String(x.gst_amount ?? 0),
+
             rate: Number(x.rate) || 0,
+
             group_name: x.service_group_name || "",
           })),
         );
@@ -227,7 +307,18 @@ function BillEditScreen({ expectedType }) {
 
         service_name: "",
 
-        service_date: "",
+        service_date: today(),
+
+        room_type_id: String(bill?.room_type_id ?? ""),
+
+        room_type_name:
+          bill?.room_type_name ||
+          roomTypes.find(
+            (room) => String(room.id) === String(bill?.room_type_id),
+          )?.name ||
+          "",
+
+        bed_number: bill?.bed_number || "",
 
         quantity: "1",
 
@@ -267,6 +358,16 @@ function BillEditScreen({ expectedType }) {
 
       group_name: service.service_group_name || service.group_name || "",
 
+      room_type_id: String(bill?.room_type_id ?? ""),
+
+      room_type_name:
+        roomTypes.find((room) => String(room.id) === String(bill?.room_type_id))
+          ?.name ||
+        bill?.room_type_name ||
+        "",
+
+      bed_number: bill?.bed_number || "",
+
       priceLoading: true,
     });
 
@@ -277,8 +378,10 @@ function BillEditScreen({ expectedType }) {
         bill_type: bill.bill_type,
       });
 
-      if (bill.bill_type === "IP" && bill.room_type_id)
-        params.set("room_type_id", bill.room_type_id);
+      const selectedItemRoomTypeId = String(bill?.room_type_id ?? "");
+
+      if (bill.bill_type === "IP" && selectedItemRoomTypeId)
+        params.set("room_type_id", selectedItemRoomTypeId);
 
       if (bill.bill_type === "OP" && bill.doctor_id)
         params.set("doctor_id", bill.doctor_id);
@@ -371,6 +474,21 @@ function BillEditScreen({ expectedType }) {
 
           service_date: i.service_date,
 
+          room_type_id:
+            bill.bill_type === "IP"
+              ? Number(i.room_type_id || bill.room_type_id)
+              : null,
+
+          room_type_name:
+            bill.bill_type === "IP"
+              ? i.room_type_name || bill.room_type_name || null
+              : null,
+
+          bed_number:
+            bill.bill_type === "IP"
+              ? i.bed_number || bill.bed_number || null
+              : null,
+
           quantity: Number(i.quantity),
 
           discount_amount: Number(i.discount_amount || 0),
@@ -458,9 +576,11 @@ function BillEditScreen({ expectedType }) {
             bill && (
               <form onSubmit={save} className="space-y-5">
                 {/* Patient & Admission Details — editability controlled by DISABLED_IP_EDIT_FIELDS */}
+
                 <section className={`border-b pb-6 ${border}`}>
                   <div className="mb-4 flex items-center gap-2">
                     <UserRound size={17} className="text-[#3E439C]" />
+
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Patient & Admission Details
                     </h2>
@@ -473,6 +593,7 @@ function BillEditScreen({ expectedType }) {
                       >
                         Search Patient *
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_name || ""}
@@ -483,12 +604,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Patient ID / UHID
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_id || bill.uhid || ""}
@@ -499,12 +622,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Mobile Number
                       </label>
+
                       <input
                         type="text"
                         value={
@@ -520,12 +645,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Patient Name
                       </label>
+
                       <input
                         type="text"
                         value={bill.patient_name || ""}
@@ -536,17 +663,20 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Bill Date *
                       </label>
+
                       <div className="relative">
                         <CalendarDays
                           size={16}
                           className={`absolute left-3 top-1/2 -translate-y-1/2 ${muted}`}
                         />
+
                         <input
                           type="date"
                           value={dateOnly(bill.bill_date)}
@@ -557,12 +687,14 @@ function BillEditScreen({ expectedType }) {
                         />
                       </div>
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Doctor Name *
                       </label>
+
                       <input
                         type="text"
                         value={bill.doctor_name || ""}
@@ -573,12 +705,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Psychologist Name
                       </label>
+
                       <input
                         type="text"
                         value={bill.psychologist_name || ""}
@@ -589,12 +723,14 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Rate Category
                       </label>
+
                       <input
                         type="text"
                         value={bill.rate_category || "General IP"}
@@ -604,47 +740,67 @@ function BillEditScreen({ expectedType }) {
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Room Type
                       </label>
-                      <input
-                        type="text"
-                        value={
-                          bill.room_type_name ||
-                          bill.room_type ||
-                          bill.room_name ||
-                          bill.room_type_id ||
-                          "—"
-                        }
-                        disabled={DISABLED_IP_EDIT_FIELDS.includes(
-                          "room_type_id",
-                        )}
-                        className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
-                      />
+
+                      <select
+                        value={String(bill.room_type_id ?? "")}
+                        onChange={(event) => {
+                          const selectedRoomTypeId = event.target.value;
+
+                          const selectedRoom = roomTypes.find(
+                            (room) =>
+                              String(room.id) === String(selectedRoomTypeId),
+                          );
+
+                          setBill((current) => ({
+                            ...current,
+
+                            room_type_id: selectedRoomTypeId,
+
+                            room_type_name: selectedRoom?.name || "",
+                          }));
+                        }}
+                        className={input}
+                        required
+                      >
+                        <option value="">Select room type</option>
+
+                        {roomTypes.map((room) => (
+                          <option key={room.id} value={String(room.id)}>
+                            {room.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Admission Date
                       </label>
+
                       <input
                         type="date"
-                        max={today()}
                         value={dateOnly(bill.admission_date)}
-                        onChange={(event) => setBill((current) => ({ ...current, admission_date: event.target.value || null }))}
-                        className={input}
+                        disabled
+                        className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Discharge Date
                       </label>
+
                       <input
                         type="date"
                         max={today()}
@@ -652,46 +808,64 @@ function BillEditScreen({ expectedType }) {
                         value={dateOnly(bill.discharge_date)}
                         onChange={(event) => {
                           const nextDate = event.target.value || "";
+
                           if (nextDate && !bill.discharge_date) {
                             setPendingDischargeDate(nextDate);
+
                             setConfirmDischargeOpen(true);
+
                             return;
                           }
-                          setBill((current) => ({ ...current, discharge_date: nextDate || null }));
+
+                          setBill((current) => ({
+                            ...current,
+
+                            discharge_date: nextDate || null,
+                          }));
                         }}
                         className={input}
                       />
                     </div>
+
                     <div>
                       <label
                         className={`mb-2 block text-sm font-medium ${text}`}
                       >
                         Bed Number
                       </label>
+
                       <input
                         type="text"
-                        value={bill.bed_number || "—"}
-                        disabled={DISABLED_IP_EDIT_FIELDS.includes(
-                          "bed_number",
-                        )}
-                        className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
+                        value={bill.bed_number ?? ""}
+                        onChange={(event) =>
+                          setBill((current) => ({
+                            ...current,
+
+                            bed_number: event.target.value,
+                          }))
+                        }
+                        placeholder="Enter bed number"
+                        className={input}
                       />
                     </div>
                   </div>
                 </section>
 
                 {/* Services & Charges */}
+
                 <section>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className={`text-sm font-semibold ${text}`}>
                         Services & Charges
                       </h2>
+
                       <p className={`mt-1 text-xs ${muted}`}>
                         Select a service. The applicable rate is loaded
                         automatically.
                       </p>
                     </div>
+
                     <button
                       type="button"
                       onClick={addItem}
@@ -707,14 +881,22 @@ function BillEditScreen({ expectedType }) {
                     <table className="w-full min-w-[1200px] table-fixed text-sm">
                       <colgroup>
                         <col style={{ width: "185px" }} />
+
                         <col style={{ width: "370px" }} />
+
                         <col style={{ width: "90px" }} />
+
                         <col style={{ width: "110px" }} />
+
                         <col style={{ width: "110px" }} />
+
                         <col style={{ width: "100px" }} />
+
                         <col style={{ width: "120px" }} />
+
                         <col style={{ width: "48px" }} />
                       </colgroup>
+
                       <thead
                         className={
                           dark
@@ -726,53 +908,81 @@ function BillEditScreen({ expectedType }) {
                           <th className="px-3 py-3 text-left text-xs font-semibold">
                             Service Date
                           </th>
+
                           <th className="px-3 py-3 text-left text-xs font-semibold">
                             IP Service
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Quantity
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Rate (₹)
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Gross Amount
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Discount (₹)
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             GST (₹)
                           </th>
+
                           <th className="px-3 py-3 text-right text-xs font-semibold">
                             Net Amount
                           </th>
+
                           <th className="px-2 py-3" />
                         </tr>
                       </thead>
+
                       <tbody>
                         {items.map((item, index) => {
+                          const isAutomatedIPService =
+                            String(bill.bill_type || "").toUpperCase() ===
+                              "IP" &&
+                            AUTOMATED_IP_SERVICE_NAMES.has(
+                              String(item.service_name || "")
+                                .trim()
+
+                                .toLowerCase(),
+                            );
+
                           const quantity = Math.max(
                             0,
+
                             Number(item.quantity) || 0,
                           );
+
                           const rate = Math.max(0, Number(item.rate) || 0);
+
                           const gross = quantity * rate;
+
                           const discount = Math.max(
                             0,
+
                             Number(item.discount_amount) || 0,
                           );
+
                           const net = Math.max(
                             0,
+
                             gross - discount + (Number(item.gst_amount) || 0),
                           );
+
                           return (
                             <tr key={item.key} className={`border-t ${border}`}>
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="date"
                                   max={today()}
-                                  className={input}
+                                  disabled={isAutomatedIPService}
+                                  className={`${input} disabled:cursor-not-allowed disabled:opacity-60`}
                                   value={item.service_date || ""}
                                   onChange={(e) =>
                                     updateItem(item.key, {
@@ -783,6 +993,7 @@ function BillEditScreen({ expectedType }) {
                                   required
                                 />
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <div className="min-w-0 overflow-hidden">
                                   <SearchableDropdown
@@ -795,6 +1006,7 @@ function BillEditScreen({ expectedType }) {
                                       (item.service_id
                                         ? {
                                             id: item.service_id,
+
                                             name: item.service_name,
                                           }
                                         : null)
@@ -802,6 +1014,7 @@ function BillEditScreen({ expectedType }) {
                                     onChange={(service) =>
                                       selectService(
                                         item.key,
+
                                         service
                                           ? String(
                                               service.id ?? service.service_id,
@@ -813,6 +1026,7 @@ function BillEditScreen({ expectedType }) {
                                       services.filter((s) =>
                                         String(s.name ?? s.service_name ?? "")
                                           .toLowerCase()
+
                                           .includes(
                                             String(search ?? "").toLowerCase(),
                                           ),
@@ -822,6 +1036,7 @@ function BillEditScreen({ expectedType }) {
                                       s.name || s.service_name || ""
                                     }
                                     getOptionValue={(s) => s.id ?? s.service_id}
+                                    disabled={isAutomatedIPService}
                                     placeholder="Select IP service"
                                     searchPlaceholder="Search IP services..."
                                     emptyMessage="No matching IP services found."
@@ -830,24 +1045,44 @@ function BillEditScreen({ expectedType }) {
                                     className="w-full min-w-0"
                                   />
                                 </div>
+
                                 {item.priceLoading && (
                                   <p className={`mt-1 text-xs ${muted}`}>
                                     Loading applicable price…
                                   </p>
                                 )}
+
                                 {item.priceError && (
                                   <p className="mt-1 text-xs text-red-500">
                                     {item.priceError}
                                   </p>
                                 )}
+
+                                {bill.bill_type === "IP" && item.service_id && (
+                                  <p className={`mt-1 text-xs ${muted}`}>
+                                    Charged under:{" "}
+                                    {item.room_type_name ||
+                                      roomTypes.find(
+                                        (room) =>
+                                          String(room.id) ===
+                                          String(item.room_type_id),
+                                      )?.name ||
+                                      "Room type not recorded"}
+                                    {item.bed_number
+                                      ? ` · Bed ${item.bed_number}`
+                                      : " · Bed not recorded"}
+                                  </p>
+                                )}
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="number"
                                   min="0.01"
                                   step="0.01"
-                                  className={`${input} text-right`}
+                                  className={`${input} text-right disabled:cursor-not-allowed disabled:opacity-70`}
                                   value={item.quantity}
+                                  disabled={isAutomatedIPService}
                                   onChange={(e) =>
                                     updateItem(item.key, {
                                       quantity: e.target.value,
@@ -857,6 +1092,7 @@ function BillEditScreen({ expectedType }) {
                                   required
                                 />
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <div
                                   className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
@@ -868,6 +1104,7 @@ function BillEditScreen({ expectedType }) {
                                   </span>
                                 </div>
                               </td>
+
                               <td
                                 className={`px-3 py-2.5 text-right align-middle ${muted}`}
                               >
@@ -875,6 +1112,7 @@ function BillEditScreen({ expectedType }) {
                                   {money(gross)}
                                 </span>
                               </td>
+
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="number"
@@ -890,13 +1128,33 @@ function BillEditScreen({ expectedType }) {
                                   aria-label={`Discount for item ${index + 1}`}
                                 />
                               </td>
-                              <td
-                                className={`px-3 py-2.5 text-right align-middle ${muted}`}
-                              >
-                                <span className="whitespace-nowrap">
-                                  {money(item.gst_amount)}
-                                </span>
+
+                              <td className="px-3 py-2.5 align-middle">
+                                {String(item.service_name || "")
+                                  .trim()
+                                  .toLowerCase() === "room rent" ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className={`${input} text-right`}
+                                    value={item.gst_amount}
+                                    onChange={(e) =>
+                                      updateItem(item.key, {
+                                        gst_amount: e.target.value,
+                                      })
+                                    }
+                                    aria-label={`GST for item ${index + 1}`}
+                                  />
+                                ) : (
+                                  <span
+                                    className={`block text-right whitespace-nowrap ${muted}`}
+                                  >
+                                    {money(item.gst_amount)}
+                                  </span>
+                                )}
                               </td>
+
                               <td
                                 className={`px-3 py-2.5 text-right align-middle font-semibold ${text}`}
                               >
@@ -904,16 +1162,23 @@ function BillEditScreen({ expectedType }) {
                                   {money(net)}
                                 </span>
                               </td>
+
                               <td className="px-2 py-2.5 text-center align-middle">
                                 <button
                                   type="button"
-                                  title={`Remove service ${index + 1}`}
+                                  title={
+                                    isAutomatedIPService
+                                      ? "Automatically populated service cannot be removed"
+                                      : `Remove service ${index + 1}`
+                                  }
                                   onClick={() =>
                                     setItems((prev) =>
                                       prev.filter((i) => i.key !== item.key),
                                     )
                                   }
-                                  disabled={items.length === 1}
+                                  disabled={
+                                    isAutomatedIPService || items.length === 1
+                                  }
                                   className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 dark:hover:bg-red-950/30"
                                 >
                                   <Trash2 size={16} />
@@ -925,6 +1190,40 @@ function BillEditScreen({ expectedType }) {
                       </tbody>
                     </table>
                   </div>
+                </section>
+
+                <section className={`rounded-lg border p-4 ${border} ${panel}`}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <FileText size={17} className="text-[#3E439C]" />
+                    <h2 className={`text-sm font-semibold ${text}`}>
+                      Billing Notes
+                    </h2>
+                  </div>
+
+                  <label
+                    htmlFor="ip-billing-notes"
+                    className={`mb-2 block text-sm font-medium ${text}`}
+                  >
+                    Notes (optional)
+                  </label>
+
+                  <textarea
+                    id="ip-billing-notes"
+                    rows={4}
+                    value={bill.notes || ""}
+                    onChange={(event) =>
+                      setBill((current) => ({
+                        ...current,
+                        notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Additional inpatient billing notes"
+                    className={`w-full rounded-md border px-3 py-2.5 text-sm outline-none focus:border-[#3E439C] ${
+                      dark
+                        ? "border-slate-700 bg-[#171827] text-slate-100 placeholder:text-slate-500"
+                        : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+                    }`}
+                  />
                 </section>
 
                 <section className={`rounded-lg border p-4 ${border} ${panel}`}>
@@ -1002,6 +1301,7 @@ function BillEditScreen({ expectedType }) {
           )}
         </main>
       </div>
+
       <ConfirmDialog
         isOpen={confirmDischargeOpen}
         title="Confirm patient discharge"
@@ -1010,12 +1310,19 @@ function BillEditScreen({ expectedType }) {
         confirmText="Confirm Discharge"
         cancelText="Go Back"
         onConfirm={() => {
-          setBill((current) => ({ ...current, discharge_date: pendingDischargeDate || null }));
+          setBill((current) => ({
+            ...current,
+
+            discharge_date: pendingDischargeDate || null,
+          }));
+
           setPendingDischargeDate("");
+
           setConfirmDischargeOpen(false);
         }}
         onCancel={() => {
           setPendingDischargeDate("");
+
           setConfirmDischargeOpen(false);
         }}
       />

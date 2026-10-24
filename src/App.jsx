@@ -47,6 +47,7 @@ import PaymentRefunds from "./Pages/PaymentRefunds";
 import RecordPaymentRefund from "./Pages/RecordPaymentRefund";
 import RefundDetails from "./Pages/RefundDetails";
 import Reports from "./Pages/Reports";
+import BillHistory from "./Pages/BillHistory";
 
 export default function App() {
   return (
@@ -105,6 +106,16 @@ export default function App() {
             <EditPatient />
           </ProtectedRoute>
         }
+      />
+
+      {/* Bill history and audit trail */}
+      <Route
+        path="/bill-history"
+        element={<ProtectedRoute permission="bills.history.view"><BillHistory /></ProtectedRoute>}
+      />
+      <Route
+        path="/bill-history/:billId"
+        element={<ProtectedRoute permission="bills.history.view"><BillHistory /></ProtectedRoute>}
       />
 
       {/* OP Billing */}

@@ -37,6 +37,10 @@ const GROUPS = [
     keys: ["bills.ip.view", "bills.ip.create", "bills.ip.edit"],
   },
   {
+    title: "Bill History",
+    keys: ["bills.history.view"],
+  },
+  {
     title: "Nurse",
     keys: ["nurse.view", "nurse.add_services", "nurse.all_service_groups"],
   },
@@ -266,7 +270,12 @@ export default function RoleDetails() {
                       </p>
 
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                        {new Date(role.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true })}
+                        {new Date(role.created_at).toLocaleString("en-IN", {
+                          timeZone: "Asia/Kolkata",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
                       </p>
                     </div>
                   )}
@@ -278,7 +287,12 @@ export default function RoleDetails() {
                       </p>
 
                       <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                        {new Date(role.updated_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true })}
+                        {new Date(role.updated_at).toLocaleString("en-IN", {
+                          timeZone: "Asia/Kolkata",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
                       </p>
                     </div>
                   )}
