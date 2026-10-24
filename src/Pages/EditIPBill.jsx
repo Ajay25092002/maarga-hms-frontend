@@ -71,25 +71,14 @@ const DISABLED_IP_EDIT_FIELDS = [
  */
 
 const AUTOMATED_IP_SERVICE_NAMES = new Set([
-  "room rent",
-
-  "holistic therapies",
-
-  "diet & food",
-
-  "doctor consultation",
-
-  "nursing charges",
-
-  "psychiatric consultation/treatment",
-
-  "psychologist counselling/treatment",
-
-  "recreation actvities/therapy",
-
-  // Also accept the correctly spelled version if the service name is corrected.
-
-  "recreation activities/therapy",
+  "ROOM RENT",
+  "HOLISTIC THERAPIES",
+  "DIET & FOOD",
+  "DOCTOR CONSULTATION",
+  "NURSING CHARGES",
+  "PSYCHIATRIC CONSULTATION/TREATMENT",
+  "PSYCHOLOGIST COUNSELLING/TREATMENT",
+  "RECREATION ACTVITIES/THERAPY",
 ]);
 
 const money = (v) =>
