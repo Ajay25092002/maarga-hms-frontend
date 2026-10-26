@@ -149,6 +149,7 @@ function BillEditScreen({ expectedType }) {
   const [pendingDischargeDate, setPendingDischargeDate] = useState("");
 
   const [confirmDischargeOpen, setConfirmDischargeOpen] = useState(false);
+  const [restrictAutoServices, setRestrictAutoServices] = useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -793,7 +794,8 @@ function BillEditScreen({ expectedType }) {
                       <input
                         type="date"
                         max={today()}
-                        min={dateOnly(bill.admission_date) || undefined}
+                        // min={dateOnly(bill.admission_date) || undefined}
+                        min={undefined}
                         value={dateOnly(bill.discharge_date)}
                         onChange={(event) => {
                           const nextDate = event.target.value || "";
@@ -933,13 +935,13 @@ function BillEditScreen({ expectedType }) {
                       <tbody>
                         {items.map((item, index) => {
                           const isAutomatedIPService =
+                            restrictAutoServices &&
                             String(bill.bill_type || "").toUpperCase() ===
                               "IP" &&
                             AUTOMATED_IP_SERVICE_NAMES.has(
                               String(item.service_name || "")
                                 .trim()
-
-                                .toLowerCase(),
+                                .toUpperCase(),
                             );
 
                           const quantity = Math.max(

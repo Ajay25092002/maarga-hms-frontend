@@ -261,6 +261,7 @@ export default function CreateIPBill() {
 
   const [isLoadingRequiredServices, setIsLoadingRequiredServices] =
     useState(false);
+  const [restrictAutoServices, setRestrictAutoServices] = useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
 
@@ -1720,6 +1721,7 @@ export default function CreateIPBill() {
                         )
                         .map(({ category, item }, index) => {
                           const isAutomatedIPService =
+                            restrictAutoServices &&
                             Boolean(item.isAutomaticallyPopulated) &&
                             AUTOMATED_IP_SERVICE_NAMES.has(
                               String(item.description || "")
