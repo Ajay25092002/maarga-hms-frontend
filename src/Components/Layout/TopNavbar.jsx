@@ -187,9 +187,9 @@ export default function TopNavbar({
 
       {/* Theme and user profile */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-        <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
+        {/* <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" /> */}
 
-        <button
+        {/* <button
           type="button"
           aria-label={`Switch to ${isDark ? "light" : "dark"} theme`}
           title={`Switch to ${isDark ? "light" : "dark"} theme`}
@@ -201,9 +201,9 @@ export default function TopNavbar({
           ) : (
             <Moon size={18} strokeWidth={1.8} />
           )}
-        </button>
+        </button> */}
 
-        <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
+        {/* <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" /> */}
 
         <div className="relative" ref={menuRef}>
           <button
