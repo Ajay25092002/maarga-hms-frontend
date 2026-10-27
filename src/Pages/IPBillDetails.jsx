@@ -8,7 +8,7 @@ import {
   BedDouble,
   CalendarDays,
   CreditCard,
-  Printer,
+  Download ,
   ReceiptText,
   RefreshCw,
   UserRound,
@@ -127,7 +127,23 @@ const getStatus = (bill) => {
 
 
 
+
+
+
+
+
+
+
+
  * Resolves a service-group name from common API response shapes.
+
+
+
+
+
+
+
+
 
 
 
@@ -143,6 +159,14 @@ const getStatus = (bill) => {
 
 
 
+
+
+
+
+
+
+
+
  * If the API returns only a group ID, the backend must also return
 
 
@@ -151,7 +175,23 @@ const getStatus = (bill) => {
 
 
 
+
+
+
+
+
+
+
+
  * the corresponding group name for the frontend to display it.
+
+
+
+
+
+
+
+
 
 
 
@@ -272,8 +312,11 @@ export default function IPBillDetails() {
   const dark = theme === "dark";
 
   const [bill, setBill] = useState(null);
+
   const [roomHistory, setRoomHistory] = useState([]);
+
   const [roomHistoryLoading, setRoomHistoryLoading] = useState(false);
+
   const [roomHistoryError, setRoomHistoryError] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -371,10 +414,13 @@ export default function IPBillDetails() {
   }, [loadBill, refreshKey]);
 
   // Room history is fetched from its dedicated endpoint, separately from bill details.
+
   useEffect(() => {
     if (!billId) {
       setRoomHistory([]);
+
       setRoomHistoryError("");
+
       return undefined;
     }
 
@@ -382,15 +428,20 @@ export default function IPBillDetails() {
 
     const loadRoomHistory = async () => {
       setRoomHistoryLoading(true);
+
       setRoomHistoryError("");
 
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/room-history`,
+
           {
             method: "GET",
+
             credentials: "include",
+
             headers: { Accept: "application/json" },
+
             signal: controller.signal,
           },
         );
@@ -401,12 +452,14 @@ export default function IPBillDetails() {
           throw new Error(
             getErrorMessage(
               data,
+
               `Unable to load room history (HTTP ${response.status}).`,
             ),
           );
         }
 
         // Support either a plain array or a wrapped API response.
+
         const records = Array.isArray(data)
           ? data
           : Array.isArray(data?.room_history)
@@ -418,14 +471,19 @@ export default function IPBillDetails() {
         setRoomHistory(
           [...records].sort((a, b) => {
             const aTime = new Date(a?.start_at ?? a?.created_at ?? 0).getTime();
+
             const bTime = new Date(b?.start_at ?? b?.created_at ?? 0).getTime();
+
             return bTime - aTime;
           }),
         );
       } catch (err) {
         if (err.name === "AbortError") return;
+
         console.error("Failed to load IP room history:", err);
+
         setRoomHistory([]);
+
         setRoomHistoryError(err.message || "Unable to load room history.");
       } finally {
         if (!controller.signal.aborted) setRoomHistoryLoading(false);
@@ -433,6 +491,7 @@ export default function IPBillDetails() {
     };
 
     loadRoomHistory();
+
     return () => controller.abort();
   }, [billId, refreshKey]);
 
@@ -513,61 +572,38 @@ export default function IPBillDetails() {
   const handlePrintPdf = async () => {
     if (!billId || !bill || pdfLoading) return;
 
-    const printWindow = window.open("about:blank", "_blank");
-
-    if (!printWindow) {
-      window.alert(
-        "Your browser blocked the PDF tab. Allow pop-ups and try again.",
-      );
-
-      return;
-    }
-
-    printWindow.document.title = "IP Bill PDF";
-
-    printWindow.document.body.innerHTML =
-      '<p style="font-family:Arial,sans-serif;padding:24px">Preparing your IP bill PDF...</p>';
-
     setPdfLoading(true);
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/ip-pdf`,
-
         {
           method: "GET",
-
           credentials: "include",
-
           headers: { Accept: "application/pdf" },
         },
       );
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type") || "";
-
         let message = `Unable to generate IP PDF (HTTP ${response.status}).`;
 
         if (contentType.includes("application/json")) {
           message = getErrorMessage(
             await response.json().catch(() => null),
-
             message,
           );
         } else {
           const bodyText = await response.text().catch(() => "");
-
           if (bodyText) message = bodyText;
         }
 
         throw new Error(message);
       }
 
-      if (
-        !(response.headers.get("content-type") || "").includes(
-          "application/pdf",
-        )
-      ) {
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/pdf")) {
         throw new Error("The server did not return a PDF document.");
       }
 
@@ -577,18 +613,35 @@ export default function IPBillDetails() {
         throw new Error("The server returned an empty PDF.");
       }
 
+      const patientName = getPatientName(bill);
+      const billNumber = bill.bill_number ?? bill.id ?? billId;
+
+      const safePatientName = String(patientName || "Patient")
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .trim();
+
+      const safeBillNumber = String(billNumber)
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .trim();
+
+      const fileName = `PT. ${safePatientName} BILL IP-Bill-${safeBillNumber}.pdf`;
       const pdfUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
 
-      printWindow.location.href = pdfUrl;
+      link.href = pdfUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
 
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10 * 60 * 1000);
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
     } catch (err) {
-      console.error("Failed to open IP bill PDF:", err);
-
-      printWindow.close();
+      console.error("Failed to download IP bill PDF:", err);
 
       window.alert(
-        err instanceof Error ? err.message : "Unable to open the IP bill PDF.",
+        err instanceof Error
+          ? err.message
+          : "Unable to download the IP bill PDF.",
       );
     } finally {
       setPdfLoading(false);
@@ -673,10 +726,10 @@ export default function IPBillDetails() {
                   {pdfLoading ? (
                     <RefreshCw size={16} className="animate-spin" />
                   ) : (
-                    <Printer size={16} />
+                    <Download size={16} />
                   )}
 
-                  {pdfLoading ? "Preparing PDF..." : "Print PDF"}
+                  {pdfLoading ? "Preparing PDF..." : "Download PDF"}
                 </button>
               </div>
             </div>
@@ -1205,6 +1258,7 @@ export default function IPBillDetails() {
                       {currency(
                         Math.max(
                           0,
+
                           Math.max(0, totalPayments - totalRefunds) - total,
                         ),
                       )}
@@ -1449,6 +1503,7 @@ export default function IPBillDetails() {
                       <p className="text-sm text-red-600 dark:text-red-400">
                         {roomHistoryError}
                       </p>
+
                       <button
                         type="button"
                         onClick={() => setRefreshKey((current) => current + 1)}
@@ -1472,9 +1527,13 @@ export default function IPBillDetails() {
                           <tr>
                             {[
                               "Room Type",
+
                               "Bed Number",
+
                               "Start Date & Time",
+
                               "End Date & Time",
+
                               "Updated By",
                             ].map((heading) => (
                               <th
@@ -1486,9 +1545,11 @@ export default function IPBillDetails() {
                             ))}
                           </tr>
                         </thead>
+
                         <tbody>
                           {roomHistory.map((entry, index) => {
                             const isCurrent = !entry?.end_at;
+
                             return (
                               <tr
                                 key={
@@ -1505,19 +1566,23 @@ export default function IPBillDetails() {
                                       entry?.room_type,
                                   )}
                                 </td>
+
                                 <td
                                   className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
                                 >
                                   {displayValue(entry?.bed_number)}
                                 </td>
+
                                 <td
                                   className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
                                 >
                                   {formatDate(
                                     entry?.start_at ?? entry?.created_at,
+
                                     true,
                                   )}
                                 </td>
+
                                 <td
                                   className={`whitespace-nowrap border-b px-3 py-3 ${border} ${text}`}
                                 >
@@ -1529,11 +1594,13 @@ export default function IPBillDetails() {
                                     formatDate(entry?.end_at, true)
                                   )}
                                 </td>
+
                                 <td
                                   className={`border-b px-3 py-3 ${border} ${text}`}
                                 >
                                   {displayValue(
                                     entry?.changed_by_name,
+
                                     "Unknown User",
                                   )}
                                 </td>

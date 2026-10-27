@@ -7,7 +7,7 @@ import {
   AlertCircle,
   CalendarDays,
   CreditCard,
-  Printer,
+  Download,
   ReceiptText,
   RefreshCw,
   UserRound,
@@ -21,7 +21,7 @@ import { useTheme } from "../Context/ThemeContext";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
-).replace(/\/+$/, "");
+).replace(/\/$/, "");
 
 const currency = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -42,11 +42,16 @@ const formatDate = (value, includeTime = false) => {
   if (Number.isNaN(date.getTime())) return "—";
 
   const hasTime = typeof value === "string" && value.includes("T");
+
   return date.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
+
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
+
     ...(includeTime && hasTime
       ? { hour: "2-digit", minute: "2-digit", hour12: true }
       : {}),
@@ -394,50 +399,29 @@ export default function OPBillDetails() {
   const handlePrintPdf = async () => {
     if (!billId || !bill || pdfLoading) return;
 
-    const printWindow = window.open("about:blank", "_blank");
-
-    if (!printWindow) {
-      window.alert(
-        "Your browser blocked the PDF tab. Allow pop-ups and try again.",
-      );
-
-      return;
-    }
-
-    printWindow.document.title = "OP Bill PDF";
-
-    printWindow.document.body.innerHTML =
-      '<p style="font-family:Arial,sans-serif;padding:24px">Preparing your OP bill PDF...</p>';
-
     setPdfLoading(true);
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/op-pdf`,
-
         {
           method: "GET",
-
           credentials: "include",
-
           headers: { Accept: "application/pdf" },
         },
       );
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type") || "";
-
         let message = `Unable to generate OP PDF (HTTP ${response.status}).`;
 
         if (contentType.includes("application/json")) {
           message = getErrorMessage(
             await response.json().catch(() => null),
-
             message,
           );
         } else {
           const responseText = await response.text().catch(() => "");
-
           if (responseText) message = responseText;
         }
 
@@ -456,18 +440,35 @@ export default function OPBillDetails() {
         throw new Error("The server returned an empty PDF.");
       }
 
+      const patientName = getPatientName(bill);
+      const billNumber = bill.bill_number ?? bill.id ?? billId;
+
+      const safePatientName = String(patientName || "Patient")
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .trim();
+
+      const safeBillNumber = String(billNumber)
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .trim();
+
+      const fileName = `PT. ${safePatientName} BILL OP-Bill-${safeBillNumber}.pdf`;
       const pdfUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
 
-      printWindow.location.href = pdfUrl;
+      link.href = pdfUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
 
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10 * 60 * 1000);
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
     } catch (err) {
-      console.error("Failed to open OP bill PDF:", err);
-
-      printWindow.close();
+      console.error("Failed to download OP bill PDF:", err);
 
       window.alert(
-        err instanceof Error ? err.message : "Unable to open the OP bill PDF.",
+        err instanceof Error
+          ? err.message
+          : "Unable to download the OP bill PDF.",
       );
     } finally {
       setPdfLoading(false);
@@ -570,10 +571,10 @@ export default function OPBillDetails() {
                   {pdfLoading ? (
                     <RefreshCw size={16} className="animate-spin" />
                   ) : (
-                    <Printer size={16} />
+                    <Download size={16} />
                   )}
 
-                  {pdfLoading ? "Preparing PDF..." : "Print PDF"}
+                  {pdfLoading ? "Preparing PDF..." : "Download PDF"}
                 </button>
               </div>
             </div>
@@ -765,15 +766,18 @@ export default function OPBillDetails() {
                       value={bill.rate_category || "General OPD"}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Last Updated By"
                       value={bill.updated_by_name ?? "—"}
                       dark={dark}
                     />
+
                     <DetailField
                       label="Updated At"
                       value={formatDate(
                         bill.updated_at ?? bill.last_updated_at,
+
                         true,
                       )}
                       dark={dark}
@@ -1146,10 +1150,15 @@ export default function OPBillDetails() {
                           <tr>
                             {[
                               "Refund No.",
+
                               "Refund Date",
+
                               "Payment Receipt",
+
                               "Method",
+
                               "Reason",
+
                               "Refund Amount",
                             ].map((heading) => (
                               <th
@@ -1181,6 +1190,7 @@ export default function OPBillDetails() {
                               >
                                 {formatDate(
                                   refund?.created_at ?? refund?.refund_date,
+
                                   true,
                                 )}
                               </td>
