@@ -92,6 +92,8 @@ const createCharge = () => ({
 
   description: "",
 
+  special_note: "",
+
   quantity: "1",
 
   rate: "",
@@ -707,6 +709,8 @@ export default function CreateIPBill() {
       updateCharge(categoryId, chargeId, {
         service_id: String(serviceId),
         description: getName(service),
+        requires_special_note: Boolean(service?.requires_special_note),
+        special_note: service?.requires_special_note ? undefined : "",
         rate: "",
         gst_amount: "0",
         priceLoading: false,
@@ -719,6 +723,8 @@ export default function CreateIPBill() {
       service_id: String(serviceId),
 
       description: getName(service),
+      requires_special_note: Boolean(service?.requires_special_note),
+      special_note: service?.requires_special_note ? undefined : "",
 
       rate: "",
 
@@ -1174,6 +1180,10 @@ export default function CreateIPBill() {
     }
 
     for (const item of items) {
+      const selectedService = services.find((service) => String(getId(service)) === String(item.service_id));
+      if (selectedService?.requires_special_note && !String(item.special_note || "").trim()) {
+        return fail(`Enter a note for ${getName(selectedService)}.`);
+      }
       if (item.priceLoading) {
         return fail("Wait for all service prices to finish loading.");
       }
@@ -1246,6 +1256,7 @@ export default function CreateIPBill() {
             service_id: Number(item.service_id),
 
             service_date: item.service_date || billDate,
+            special_note: item.special_note?.trim() || null,
 
             room_type_id: Number(roomTypeId),
 
@@ -1879,6 +1890,21 @@ export default function CreateIPBill() {
                                     className="w-full min-w-0"
                                   />
                                 </div>
+
+                                {services.find((service) => String(getId(service)) === String(item.service_id))?.requires_special_note && (
+                                  <div className="mt-2">
+                                    <label className={`mb-1 block text-xs font-medium ${text}`}>Special note *</label>
+                                    <textarea
+                                      value={item.special_note || ""}
+                                      onChange={(event) => updateCharge(category.id, item.id, { special_note: event.target.value })}
+                                      rows={2}
+                                      maxLength={2000}
+                                      placeholder="Enter the reason/details for this miscellaneous charge"
+                                      className={`${inputClass} min-h-[64px] resize-y`}
+                                      required
+                                    />
+                                  </div>
+                                )}
 
                                 {item.priceLoading && (
                                   <p

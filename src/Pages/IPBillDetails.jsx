@@ -1048,7 +1048,17 @@ export default function IPBillDetails() {
                                 <td
                                   className={`border-b px-3 py-3 ${border} ${text}`}
                                 >
-                                  {getServiceName(item)}
+                                  <div>
+                                    <div>{getServiceName(item)}</div>
+
+                                    {item?.special_note?.trim() && (
+                                      <p
+                                        className={`mt-1 whitespace-pre-wrap text-xs ${muted}`}
+                                      >
+                                        Note: {item.special_note}
+                                      </p>
+                                    )}
+                                  </div>
                                 </td>
 
                                 <td
