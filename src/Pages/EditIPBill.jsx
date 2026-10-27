@@ -72,14 +72,34 @@ const DISABLED_IP_EDIT_FIELDS = [
 
 const AUTOMATED_IP_SERVICE_NAMES = new Set([
   "ROOM RENT",
+
   "HOLISTIC THERAPIES",
+
   "DIET & FOOD",
+
   "DOCTOR CONSULTATION",
+
   "NURSING CHARGES",
+
   "PSYCHIATRIC CONSULTATION/TREATMENT",
+
   "PSYCHOLOGIST COUNSELLING/TREATMENT",
+
   "RECREATION ACTVITIES/THERAPY",
 ]);
+
+const FRONTEND_RATE_SERVICE_NAMES = new Set([
+  "RETRIEVAL CHARGES",
+  "LAUNDRY CHARGES",
+  "MISCELLANEOUS",
+]);
+
+const isFrontendRateService = (serviceName) =>
+  FRONTEND_RATE_SERVICE_NAMES.has(
+    String(serviceName || "")
+      .trim()
+      .toUpperCase(),
+  );
 
 const money = (v) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
@@ -149,6 +169,7 @@ function BillEditScreen({ expectedType }) {
   const [pendingDischargeDate, setPendingDischargeDate] = useState("");
 
   const [confirmDischargeOpen, setConfirmDischargeOpen] = useState(false);
+
   const [restrictAutoServices, setRestrictAutoServices] = useState(false);
 
   const text = dark ? "text-slate-100" : "text-slate-800";
@@ -218,6 +239,7 @@ function BillEditScreen({ expectedType }) {
             isAutomaticallyPopulated: AUTOMATED_IP_SERVICE_NAMES.has(
               String(x.service_name || x.name || "")
                 .trim()
+
                 .toLowerCase(),
             ),
 
@@ -357,9 +379,19 @@ function BillEditScreen({ expectedType }) {
         "",
 
       bed_number: bill?.bed_number || "",
-
-      priceLoading: true,
+      priceLoading: !isFrontendRateService(
+        service.name || service.service_name,
+      ),
+      priceError: "",
+      ...(isFrontendRateService(service.name || service.service_name)
+        ? { rate: "" }
+        : {}),
     });
+
+    if (isFrontendRateService(service.name || service.service_name)) {
+      updateItem(key, { priceLoading: false, rate: "", priceError: "" });
+      return;
+    }
 
     try {
       const params = new URLSearchParams({
@@ -410,7 +442,12 @@ function BillEditScreen({ expectedType }) {
           !i.service_id ||
           !i.service_date ||
           Number(i.quantity) <= 0 ||
-          Number(i.discount_amount) < 0,
+          Number(i.discount_amount) < 0 ||
+          (isFrontendRateService(i.service_name) &&
+            (i.rate === "" ||
+              i.rate === null ||
+              !Number.isFinite(Number(i.rate)) ||
+              Number(i.rate) < 0)),
       )
     ) {
       showToast({
@@ -480,7 +517,7 @@ function BillEditScreen({ expectedType }) {
               : null,
 
           quantity: Number(i.quantity),
-
+          rate: Number(i.rate || 0),
           discount_amount: Number(i.discount_amount || 0),
 
           gst_amount: Number(i.gst_amount || 0),
@@ -795,6 +832,7 @@ function BillEditScreen({ expectedType }) {
                         type="date"
                         max={today()}
                         // min={dateOnly(bill.admission_date) || undefined}
+
                         min={undefined}
                         value={dateOnly(bill.discharge_date)}
                         onChange={(event) => {
@@ -941,6 +979,7 @@ function BillEditScreen({ expectedType }) {
                             AUTOMATED_IP_SERVICE_NAMES.has(
                               String(item.service_name || "")
                                 .trim()
+
                                 .toUpperCase(),
                             );
 
@@ -1085,15 +1124,33 @@ function BillEditScreen({ expectedType }) {
                               </td>
 
                               <td className="px-3 py-2.5 align-middle">
-                                <div
-                                  className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
-                                >
-                                  <span className="truncate">
-                                    {item.priceLoading
-                                      ? "Loading…"
-                                      : money(rate)}
-                                  </span>
-                                </div>
+                                {isFrontendRateService(item.service_name) ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.rate ?? ""}
+                                    onChange={(e) =>
+                                      updateItem(item.key, {
+                                        rate: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Enter rate"
+                                    className={`${input} text-right`}
+                                    aria-label={`Rate for ${item.service_name}`}
+                                    required
+                                  />
+                                ) : (
+                                  <div
+                                    className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
+                                  >
+                                    <span className="truncate">
+                                      {item.priceLoading
+                                        ? "Loading…"
+                                        : money(rate)}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
 
                               <td
@@ -1123,6 +1180,7 @@ function BillEditScreen({ expectedType }) {
                               <td className="px-3 py-2.5 align-middle">
                                 {String(item.service_name || "")
                                   .trim()
+
                                   .toLowerCase() === "room rent" ? (
                                   <input
                                     type="number"
@@ -1186,6 +1244,7 @@ function BillEditScreen({ expectedType }) {
                 <section className={`rounded-lg border p-4 ${border} ${panel}`}>
                   <div className="mb-3 flex items-center gap-2">
                     <FileText size={17} className="text-[#3E439C]" />
+
                     <h2 className={`text-sm font-semibold ${text}`}>
                       Billing Notes
                     </h2>
@@ -1205,6 +1264,7 @@ function BillEditScreen({ expectedType }) {
                     onChange={(event) =>
                       setBill((current) => ({
                         ...current,
+
                         notes: event.target.value,
                       }))
                     }

@@ -57,6 +57,19 @@ const AUTOMATED_IP_SERVICE_NAMES = new Set([
   "RECREATION ACTVITIES/THERAPY",
 ]);
 
+const FRONTEND_RATE_SERVICE_NAMES = new Set([
+  "RETRIEVAL CHARGES",
+  "LAUNDRY CHARGES",
+  "MISCELLANEOUS",
+]);
+
+const isFrontendRateService = (serviceName) =>
+  FRONTEND_RATE_SERVICE_NAMES.has(
+    String(serviceName || "")
+      .trim()
+      .toUpperCase(),
+  );
+
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -689,6 +702,19 @@ export default function CreateIPBill() {
       serviceOverride ??
       services.find((item) => String(getId(item)) === String(serviceId));
 
+    // These services use a rate entered by the billing user, not backend pricing.
+    if (isFrontendRateService(getName(service))) {
+      updateCharge(categoryId, chargeId, {
+        service_id: String(serviceId),
+        description: getName(service),
+        rate: "",
+        gst_amount: "0",
+        priceLoading: false,
+        priceError: "",
+      });
+      return;
+    }
+
     updateCharge(categoryId, chargeId, {
       service_id: String(serviceId),
 
@@ -853,6 +879,21 @@ export default function CreateIPBill() {
 
           const items = await Promise.all(
             matchedServices.map(async (service) => {
+              if (isFrontendRateService(getName(service))) {
+                return {
+                  ...createCharge(),
+                  isAutomaticallyPopulated: true,
+                  service_id: String(getId(service)),
+                  description: getName(service),
+                  rate: "",
+                  quantity: "1",
+                  discount_amount: "0",
+                  gst_amount: "0",
+                  priceLoading: false,
+                  priceError: "",
+                };
+              }
+
               try {
                 const params = new URLSearchParams({
                   service_id: String(getId(service)),
@@ -1157,7 +1198,11 @@ export default function CreateIPBill() {
       }
 
       if (!Number.isFinite(rate) || rate < 0) {
-        return fail("A valid backend service price is required.");
+        return fail(
+          isFrontendRateService(item.description)
+            ? "Enter a valid non-negative rate for this service."
+            : "A valid backend service price is required.",
+        );
       }
 
       if (!Number.isFinite(discount) || discount < 0 || discount > gross) {
@@ -1211,6 +1256,8 @@ export default function CreateIPBill() {
             bed_number: bedNumber.trim() || null,
 
             quantity: Number(item.quantity),
+
+            rate: Number(item.rate),
 
             discount_amount: Number(item.discount_amount || 0),
 
@@ -1872,14 +1919,35 @@ export default function CreateIPBill() {
                               <td className="px-3 py-2.5 align-middle">
                                 <input
                                   type="number"
+                                  min="0"
+                                  step="0.01"
                                   value={item.rate}
-                                  readOnly
-                                  aria-readonly="true"
-                                  placeholder={
-                                    item.priceLoading ? "Loading..." : "—"
+                                  readOnly={
+                                    !isFrontendRateService(item.description)
                                   }
-                                  className={`${readOnlyClass} text-right`}
-                                  title="Rate is populated by the backend and cannot be edited."
+                                  onChange={(event) =>
+                                    updateCharge(category.id, item.id, {
+                                      rate: event.target.value,
+                                    })
+                                  }
+                                  aria-label={`Rate for ${item.description || "service"}`}
+                                  placeholder={
+                                    item.priceLoading
+                                      ? "Loading..."
+                                      : isFrontendRateService(item.description)
+                                        ? "Enter rate"
+                                        : "—"
+                                  }
+                                  className={`${
+                                    isFrontendRateService(item.description)
+                                      ? inputClass
+                                      : readOnlyClass
+                                  } text-right`}
+                                  title={
+                                    isFrontendRateService(item.description)
+                                      ? "Enter the service rate."
+                                      : "Rate is populated by the backend."
+                                  }
                                 />
                               </td>
 
@@ -2061,8 +2129,9 @@ export default function CreateIPBill() {
                     </div>
 
                     <p className={`text-xs ${muted}`}>
-                      Rates are retrieved from backend pricing configuration for
-                      the selected room type.
+                      Standard services use backend pricing for the selected
+                      room type. Retrieval Charges, Laundry Charges, and
+                      Miscellaneous use the rate entered here.
                     </p>
                   </div>
                 </div>
