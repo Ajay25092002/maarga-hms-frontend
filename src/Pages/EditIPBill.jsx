@@ -64,9 +64,15 @@ const DISABLED_IP_EDIT_FIELDS = [
 
 /**
 
+
+
  * IP services automatically added by the billing scheduler.
 
+
+
  * Quantity is read-only for these service names on the IP bill edit screen.
+
+
 
  */
 
@@ -90,7 +96,9 @@ const AUTOMATED_IP_SERVICE_NAMES = new Set([
 
 const FRONTEND_RATE_SERVICE_NAMES = new Set([
   "RETRIEVAL CHARGES",
+
   "LAUNDRY CHARGES",
+
   "MISCELLANEOUS",
 ]);
 
@@ -98,6 +106,7 @@ const isFrontendRateService = (serviceName) =>
   FRONTEND_RATE_SERVICE_NAMES.has(
     String(serviceName || "")
       .trim()
+
       .toUpperCase(),
   );
 
@@ -235,7 +244,14 @@ function BillEditScreen({ expectedType }) {
             service_id: String(x.service_id),
 
             service_name: x.service_name || x.name || "",
-            requires_special_note: Boolean(x.requires_special_note || String(x.service_name || x.name || "").trim().toUpperCase() === "MISCELLANEOUS" || services.find((svc) => String(svc.id ?? svc.service_id) === String(x.service_id))?.requires_special_note),
+
+            requires_special_note: Boolean(
+              x.requires_special_note ||
+              String(x.service_name || x.name || "")
+                .trim()
+                .toUpperCase() === "MISCELLANEOUS",
+            ),
+
             special_note: x.special_note || "",
 
             isAutomaticallyPopulated: AUTOMATED_IP_SERVICE_NAMES.has(
@@ -321,6 +337,10 @@ function BillEditScreen({ expectedType }) {
 
         service_name: "",
 
+        requires_special_note: false,
+
+        special_note: "",
+
         service_date: today(),
 
         room_type_id: String(bill?.room_type_id ?? ""),
@@ -354,12 +374,13 @@ function BillEditScreen({ expectedType }) {
     if (!service) {
       updateItem(key, {
         service_id: "",
-
         service_name: "",
-
+        requires_special_note: false,
+        special_note: "",
         rate: 0,
-
         group_name: "",
+        priceLoading: false,
+        priceError: "",
       });
 
       return;
@@ -369,7 +390,9 @@ function BillEditScreen({ expectedType }) {
       service_id: String(id),
 
       service_name: service.name || service.service_name,
+
       requires_special_note: Boolean(service.requires_special_note),
+
       special_note: "",
 
       group_name: service.service_group_name || service.group_name || "",
@@ -383,10 +406,13 @@ function BillEditScreen({ expectedType }) {
         "",
 
       bed_number: bill?.bed_number || "",
+
       priceLoading: !isFrontendRateService(
         service.name || service.service_name,
       ),
+
       priceError: "",
+
       ...(isFrontendRateService(service.name || service.service_name)
         ? { rate: "" }
         : {}),
@@ -394,6 +420,7 @@ function BillEditScreen({ expectedType }) {
 
     if (isFrontendRateService(service.name || service.service_name)) {
       updateItem(key, { priceLoading: false, rate: "", priceError: "" });
+
       return;
     }
 
@@ -445,7 +472,12 @@ function BillEditScreen({ expectedType }) {
         (i) =>
           !i.service_id ||
           !i.service_date ||
-          ((i.requires_special_note || services.find((svc) => String(svc.id ?? svc.service_id) === String(i.service_id))?.requires_special_note) && !String(i.special_note || "").trim()) ||
+          ((i.requires_special_note ||
+            services.find(
+              (svc) =>
+                String(svc.id ?? svc.service_id) === String(i.service_id),
+            )?.requires_special_note) &&
+            !String(i.special_note || "").trim()) ||
           Number(i.quantity) <= 0 ||
           Number(i.discount_amount) < 0 ||
           (isFrontendRateService(i.service_name) &&
@@ -502,32 +534,37 @@ function BillEditScreen({ expectedType }) {
         rate_category: bill.rate_category || null,
 
         items: items.map((i) => ({
-        service_id: Number(i.service_id),
-        service_date: i.service_date,
+          service_id: Number(i.service_id),
 
-        room_type_id:
-          bill.bill_type === "IP"
-            ? Number(i.room_type_id || bill.room_type_id)
-            : null,
+          service_date: i.service_date,
 
-        room_type_name:
-          bill.bill_type === "IP"
-            ? i.room_type_name || bill.room_type_name || null
-            : null,
+          room_type_id:
+            bill.bill_type === "IP"
+              ? Number(i.room_type_id || bill.room_type_id)
+              : null,
 
-        bed_number:
-          bill.bill_type === "IP"
-            ? i.bed_number || bill.bed_number || null
-            : null,
+          room_type_name:
+            bill.bill_type === "IP"
+              ? i.room_type_name || bill.room_type_name || null
+              : null,
 
-        quantity: Number(i.quantity),
-        rate: Number(i.rate || 0),
-        discount_amount: Number(i.discount_amount || 0),
-        gst_amount: Number(i.gst_amount || 0),
+          bed_number:
+            bill.bill_type === "IP"
+              ? i.bed_number || bill.bed_number || null
+              : null,
 
-        // Preserve the note entered for this service.
-        special_note: i.special_note?.trim() || null,
-      })),
+          quantity: Number(i.quantity),
+
+          rate: Number(i.rate || 0),
+
+          discount_amount: Number(i.discount_amount || 0),
+
+          gst_amount: Number(i.gst_amount || 0),
+
+          // Preserve the note entered for this service.
+
+          special_note: i.special_note?.trim() || null,
+        })),
       };
 
       await api(`/api/bills/${billId}`, {
@@ -1082,12 +1119,26 @@ function BillEditScreen({ expectedType }) {
                                   />
                                 </div>
 
-                                {(item.requires_special_note || services.find((svc) => String(svc.id ?? svc.service_id) === String(item.service_id))?.requires_special_note) && (
+                                {(item.requires_special_note ||
+                                  services.find(
+                                    (svc) =>
+                                      String(svc.id ?? svc.service_id) ===
+                                      String(item.service_id),
+                                  )?.requires_special_note) && (
                                   <div className="mt-2">
-                                    <label className={`mb-1 block text-xs font-medium ${text}`}>Special note *</label>
+                                    <label
+                                      className={`mb-1 block text-xs font-medium ${text}`}
+                                    >
+                                      Special note *
+                                    </label>
+
                                     <textarea
                                       value={item.special_note || ""}
-                                      onChange={(event) => updateItem(item.key, { special_note: event.target.value })}
+                                      onChange={(event) =>
+                                        updateItem(item.key, {
+                                          special_note: event.target.value,
+                                        })
+                                      }
                                       rows={2}
                                       maxLength={2000}
                                       placeholder="Enter the reason/details for this miscellaneous charge"

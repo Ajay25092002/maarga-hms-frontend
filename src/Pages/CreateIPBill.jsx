@@ -669,15 +669,12 @@ export default function CreateIPBill() {
     if (!serviceId) {
       updateCharge(categoryId, chargeId, {
         service_id: "",
-
         description: "",
-
+        special_note: "",
+        requires_special_note: false,
         rate: "",
-
         gst_amount: "0",
-
         priceLoading: false,
-
         priceError: "",
       });
 
@@ -710,7 +707,7 @@ export default function CreateIPBill() {
         service_id: String(serviceId),
         description: getName(service),
         requires_special_note: Boolean(service?.requires_special_note),
-        special_note: service?.requires_special_note ? undefined : "",
+        special_note: "",
         rate: "",
         gst_amount: "0",
         priceLoading: false,
@@ -724,7 +721,7 @@ export default function CreateIPBill() {
 
       description: getName(service),
       requires_special_note: Boolean(service?.requires_special_note),
-      special_note: service?.requires_special_note ? undefined : "",
+      special_note: "",
 
       rate: "",
 
@@ -1180,8 +1177,13 @@ export default function CreateIPBill() {
     }
 
     for (const item of items) {
-      const selectedService = services.find((service) => String(getId(service)) === String(item.service_id));
-      if (selectedService?.requires_special_note && !String(item.special_note || "").trim()) {
+      const selectedService = services.find(
+        (service) => String(getId(service)) === String(item.service_id),
+      );
+      if (
+        selectedService?.requires_special_note &&
+        !String(item.special_note || "").trim()
+      ) {
         return fail(`Enter a note for ${getName(selectedService)}.`);
       }
       if (item.priceLoading) {
@@ -1891,12 +1893,24 @@ export default function CreateIPBill() {
                                   />
                                 </div>
 
-                                {services.find((service) => String(getId(service)) === String(item.service_id))?.requires_special_note && (
+                                {services.find(
+                                  (service) =>
+                                    String(getId(service)) ===
+                                    String(item.service_id),
+                                )?.requires_special_note && (
                                   <div className="mt-2">
-                                    <label className={`mb-1 block text-xs font-medium ${text}`}>Special note *</label>
+                                    <label
+                                      className={`mb-1 block text-xs font-medium ${text}`}
+                                    >
+                                      Special note *
+                                    </label>
                                     <textarea
                                       value={item.special_note || ""}
-                                      onChange={(event) => updateCharge(category.id, item.id, { special_note: event.target.value })}
+                                      onChange={(event) =>
+                                        updateCharge(category.id, item.id, {
+                                          special_note: event.target.value,
+                                        })
+                                      }
                                       rows={2}
                                       maxLength={2000}
                                       placeholder="Enter the reason/details for this miscellaneous charge"
