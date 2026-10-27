@@ -55,6 +55,22 @@ const serviceName = (service) =>
 
 const serviceId = (service) => service?.id ?? service?.service_id;
 
+const FRONTEND_RATE_SERVICE_NAMES = new Set([
+  "RETRIEVAL CHARGES",
+  "LAUNDRY CHARGES",
+  "MISCELLANEOUS",
+]);
+
+const isFrontendRateService = (service) =>
+  FRONTEND_RATE_SERVICE_NAMES.has(
+    serviceName(service).trim().toUpperCase(),
+  );
+
+const requiresSpecialNote = (service) =>
+  service?.requires_special_note === true ||
+  service?.requires_special_note === 1 ||
+  String(service?.requires_special_note).toLowerCase() === "true";
+
 const getAmount = (item) => {
   const explicitAmount = item?.net_amount ?? item?.total_amount ?? item?.amount;
 
@@ -172,6 +188,8 @@ export default function NurseEditIPBill() {
   const [selectedService, setSelectedService] = useState(null);
   const [quantity, setQuantity] = useState("1");
   const [serviceDate, setServiceDate] = useState(today());
+  const [enteredRate, setEnteredRate] = useState("");
+  const [specialNote, setSpecialNote] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -268,7 +286,10 @@ export default function NurseEditIPBill() {
   const revisedTotal = originalTotal + stagedTotal;
 
   const handleServiceChange = (service) => {
+    // A service change must never carry a rate or note from the previous service.
     setSelectedService(service || null);
+    setEnteredRate("");
+    setSpecialNote("");
   };
 
   const addService = async () => {
@@ -296,47 +317,76 @@ export default function NurseEditIPBill() {
       return;
     }
 
-    let rate = Number(
-      selectedService.rate ??
-        selectedService.price ??
-        selectedService.amount ??
-        selectedService.unit_price ??
-        selectedService.service_price ??
-        0,
-    );
+    const manualRate = isFrontendRateService(selectedService);
+    const noteRequired = requiresSpecialNote(selectedService);
+    let rate = 0;
 
-    try {
-      const params = new URLSearchParams({
-        service_id: String(id),
-        bill_type: "IP",
-      });
-
-      if (bill?.room_type_id) {
-        params.set("room_type_id", String(bill.room_type_id));
+    if (manualRate) {
+      if (
+        enteredRate === "" ||
+        !Number.isFinite(Number(enteredRate)) ||
+        Number(enteredRate) < 0
+      ) {
+        showToast({
+          type: "warning",
+          message: "Enter a valid rate for this service.",
+        });
+        return;
       }
-
-      const priceData = await request(
-        `/api/billing/service-price?${params.toString()}`,
+      rate = Number(enteredRate);
+    } else {
+      rate = Number(
+        selectedService.rate ??
+          selectedService.price ??
+          selectedService.amount ??
+          selectedService.unit_price ??
+          selectedService.service_price ??
+          0,
       );
 
-      const resolvedRate = Number(
-        priceData?.amount ??
-          priceData?.price ??
-          priceData?.rate ??
-          priceData?.resolved_price,
-      );
+      try {
+        const params = new URLSearchParams({
+          service_id: String(id),
+          bill_type: "IP",
+        });
 
-      if (Number.isFinite(resolvedRate) && resolvedRate >= 0) {
-        rate = resolvedRate;
+        if (bill?.room_type_id) {
+          params.set("room_type_id", String(bill.room_type_id));
+        }
+
+        const priceData = await request(
+          `/api/billing/service-price?${params.toString()}`,
+        );
+
+        const resolvedRate = Number(
+          priceData?.amount ??
+            priceData?.price ??
+            priceData?.rate ??
+            priceData?.resolved_price,
+        );
+
+        if (Number.isFinite(resolvedRate) && resolvedRate >= 0) {
+          rate = resolvedRate;
+        } else {
+          throw new Error("The service price returned by the server is invalid.");
+        }
+      } catch (err) {
+        // Keep the existing catalogue-rate fallback for normally priced services.
+        console.warn("Unable to resolve service price:", err.message);
+        showToast({
+          type: "warning",
+          title: "Price lookup unavailable",
+          message: "The service price could not be refreshed. The catalogue rate will be used.",
+        });
       }
-    } catch (err) {
-      // Preserve the existing catalogue-rate fallback.
-      console.warn("Unable to resolve service price:", err.message);
+    }
+
+    if (noteRequired && !specialNote.trim()) {
       showToast({
         type: "warning",
-        title: "Price lookup unavailable",
-        message: "The service price could not be refreshed. The catalogue rate will be used.",
+        message: "Enter a special note for this service.",
       });
+      return;
     }
 
     setStaged((current) => [
@@ -349,12 +399,16 @@ export default function NurseEditIPBill() {
         quantity: qty,
         service_date: serviceDate,
         rate,
+        special_note: noteRequired ? specialNote.trim() : "",
+        requires_special_note: noteRequired,
       },
     ]);
 
     setSelectedService(null);
     setQuantity("1");
     setServiceDate(today());
+    setEnteredRate("");
+    setSpecialNote("");
     showToast({
       type: "success",
       message: `${serviceName(selectedService)} added to the pending services list.`,
@@ -387,6 +441,8 @@ export default function NurseEditIPBill() {
               service_id: item.service_id,
               quantity: item.quantity,
               service_date: item.service_date,
+              rate: item.rate,
+              special_note: item.special_note || null,
             }),
           },
         );
@@ -562,7 +618,7 @@ export default function NurseEditIPBill() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px] text-left text-sm">
+                  <table className="w-full min-w-[920px] text-left text-sm">
                     <thead
                       className={
                         dark
@@ -578,6 +634,7 @@ export default function NurseEditIPBill() {
                           "Qty",
                           "Rate",
                           "Amount",
+                          "Special Note",
                         ].map((heading) => (
                           <th
                             key={heading}
@@ -619,12 +676,15 @@ export default function NurseEditIPBill() {
                             <td className={`px-4 py-3 ${text}`}>
                               {money(getAmount(item))}
                             </td>
+                            <td className={`px-4 py-3 ${muted} whitespace-pre-wrap`}>
+                              {item.special_note || "—"}
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className={`px-4 py-8 text-center ${muted}`}
                           >
                             No existing services found.
@@ -726,6 +786,45 @@ export default function NurseEditIPBill() {
                       className={input}
                     />
                   </div>
+
+                  {selectedService && isFrontendRateService(selectedService) && (
+                    <div>
+                      <label className={`mb-1 block text-sm font-medium ${text}`}>
+                        Rate (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={enteredRate}
+                        onChange={(event) => setEnteredRate(event.target.value)}
+                        className={input}
+                        placeholder="Enter service rate"
+                        disabled={saving}
+                      />
+                    </div>
+                  )}
+
+                  {selectedService && requiresSpecialNote(selectedService) && (
+                    <div className="md:col-span-2 xl:col-span-4">
+                      <label className={`mb-1 block text-sm font-medium ${text}`}>
+                        Special Note *
+                      </label>
+                      <textarea
+                        rows={2}
+                        maxLength={2000}
+                        value={specialNote}
+                        onChange={(event) => setSpecialNote(event.target.value)}
+                        className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-[#3E439C] ${
+                          dark
+                            ? "border-slate-700 bg-[#171827] text-slate-100"
+                            : "border-slate-200 bg-white text-slate-800"
+                        }`}
+                        placeholder="Enter the required special note"
+                        disabled={saving}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -742,7 +841,7 @@ export default function NurseEditIPBill() {
                   <div
                     className={`mt-5 overflow-x-auto rounded-md border ${border}`}
                   >
-                    <table className="w-full min-w-[760px] text-left text-sm">
+                    <table className="w-full min-w-[1100px] text-left text-sm">
                       <thead
                         className={
                           dark
@@ -756,7 +855,9 @@ export default function NurseEditIPBill() {
                             "Service Group",
                             "Date",
                             "Qty",
+                            "Rate",
                             "Estimated Amount",
+                            "Special Note",
                             "Action",
                           ].map((heading) => (
                             <th
@@ -785,7 +886,13 @@ export default function NurseEditIPBill() {
                               {item.quantity}
                             </td>
                             <td className={`px-3 py-3 ${text}`}>
+                              {money(item.rate)}
+                            </td>
+                            <td className={`px-3 py-3 ${text}`}>
                               {money(item.rate * item.quantity)}
+                            </td>
+                            <td className={`px-3 py-3 ${muted}`}>
+                              {item.special_note || "—"}
                             </td>
                             <td className="px-3 py-3">
                               <button

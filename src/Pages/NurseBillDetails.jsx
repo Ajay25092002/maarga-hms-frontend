@@ -758,7 +758,7 @@ export default function NurseBillDetails() {
                   <div
                     className={`overflow-x-auto rounded-lg border ${border}`}
                   >
-                    <table className="w-full min-w-[900px] border-collapse text-sm">
+                    <table className="w-full min-w-[1050px] border-collapse text-sm">
                       <thead>
                         <tr className={dark ? "bg-slate-800" : "bg-slate-50"}>
                           {[
@@ -781,6 +781,8 @@ export default function NurseBillDetails() {
                             "Net Amount",
 
                             "GST",
+
+                            "Special Note",
                           ].map((heading) => (
                             <th
                               key={heading}
@@ -812,7 +814,7 @@ export default function NurseBillDetails() {
                         {items.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               className={`px-3 py-8 text-center text-sm ${muted}`}
                             >
                               No itemized charges are available.
@@ -903,6 +905,12 @@ export default function NurseBillDetails() {
                                   className={`border-b px-3 py-3 text-right whitespace-nowrap tabular-nums ${border} ${text}`}
                                 >
                                   {currency(gstAmount)}
+                                </td>
+
+                                <td
+                                  className={`border-b px-3 py-3 whitespace-pre-wrap ${border} ${muted}`}
+                                >
+                                  {item?.special_note || "—"}
                                 </td>
                               </tr>
                             );
