@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -164,6 +164,46 @@ function BillEditScreen({ expectedType }) {
   const [bill, setBill] = useState(null);
 
   const [services, setServices] = useState([]);
+  const fetchIPServices = useCallback(async (search = "", { signal } = {}) => {
+    const params = new URLSearchParams({
+      bill_type: "IP",
+      search: String(search ?? "").trim(),
+      page: "1",
+      page_size: "10",
+      is_active: "true",
+    });
+
+    const data = await api(`/api/services?${params.toString()}`, {
+      signal,
+    });
+
+    const results = Array.isArray(data)
+      ? data
+      : data?.items || data?.results || data?.data || [];
+
+    const filteredResults = results.filter(
+      (service) =>
+        service.is_active !== false && service.available_for_ip !== false,
+    );
+
+    // Preserve previously loaded services for existing bill selections.
+    setServices((current) => {
+      const byId = new Map(
+        current.map((service) => [
+          String(service.id ?? service.service_id),
+          service,
+        ]),
+      );
+
+      filteredResults.forEach((service) => {
+        byId.set(String(service.id ?? service.service_id), service);
+      });
+
+      return Array.from(byId.values());
+    });
+
+    return filteredResults;
+  }, []);
 
   const [roomTypes, setRoomTypes] = useState([]);
 
@@ -1095,15 +1135,8 @@ function BillEditScreen({ expectedType }) {
                                           : "",
                                       )
                                     }
-                                    fetchOptions={async (search) =>
-                                      services.filter((s) =>
-                                        String(s.name ?? s.service_name ?? "")
-                                          .toLowerCase()
-
-                                          .includes(
-                                            String(search ?? "").toLowerCase(),
-                                          ),
-                                      )
+                                    fetchOptions={(search, options) =>
+                                      fetchIPServices(search, options)
                                     }
                                     getOptionLabel={(s) =>
                                       s.name || s.service_name || ""
