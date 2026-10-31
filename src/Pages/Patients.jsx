@@ -1,6 +1,8 @@
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import PatientsList from "../Components/Patients/PatientsList";
+import AppFooter from "../Components/Layout/AppFooter";
+
 
 export default function Patients() {
   return (
@@ -16,6 +18,8 @@ export default function Patients() {
 
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
           <PatientsList />
+                      <AppFooter />
+          
         </main>
       </div>
     </div>

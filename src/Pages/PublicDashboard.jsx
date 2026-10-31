@@ -2,6 +2,7 @@ import React from "react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import logo from "../assets/logo.png";
+import AppFooter from "../Components/Layout/AppFooter";
 
 export default function PublicDashboard() {
   return (
@@ -183,6 +184,7 @@ export default function PublicDashboard() {
               </span>
             </footer>
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

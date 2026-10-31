@@ -6,6 +6,7 @@ import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import IPBillsList from "../Components/IPBilling/IPBillsList";
 import { useTheme } from "../Context/ThemeContext";
+import AppFooter from "../Components/Layout/AppFooter";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -261,6 +262,7 @@ export default function IPBills() {
               onViewBill={handleViewBill}
             />
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

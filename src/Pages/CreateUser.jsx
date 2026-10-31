@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import UserForm from "../Components/Users/UserForm";
@@ -137,6 +137,7 @@ export default function CreateUser() {
               submitLabel="Create User"
             />
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

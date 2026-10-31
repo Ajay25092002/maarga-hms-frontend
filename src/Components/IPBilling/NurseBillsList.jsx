@@ -246,7 +246,7 @@ export default function NurseBillsList({
       />
 
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 border-t pt-4 ${border}`}
+        className={`flex flex-wrap items-center justify-between gap-3 border-t py-4 ${border}`}
       >
         <p className={`text-xs ${muted}`}>
           Page {currentPage} of {Math.max(totalPages, 1)}

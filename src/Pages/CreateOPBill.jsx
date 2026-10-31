@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -1460,7 +1460,7 @@ export default function CreateOPBill() {
               )}
 
               <div
-                className={`flex flex-wrap items-center justify-between gap-3 border-t pt-5 ${border}`}
+                className={`flex flex-wrap items-center justify-between gap-3 border-t pt-5 pb-4 ${border}`}
               >
                 <p className={`text-xs ${muted}`}>
                   {savedBill
@@ -1697,6 +1697,7 @@ export default function CreateOPBill() {
               </section>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

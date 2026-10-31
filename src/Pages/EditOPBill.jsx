@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -1039,7 +1039,9 @@ function BillEditScreen({ expectedType }) {
               </form>
             )
           )}
+          <AppFooter />
         </main>
+
       </div>
     </div>
   );

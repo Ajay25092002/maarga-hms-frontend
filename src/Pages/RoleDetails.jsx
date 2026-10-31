@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
@@ -385,6 +385,8 @@ export default function RoleDetails() {
               </Link>
             </div>
           ) : null}
+
+          <AppFooter />
         </main>
       </div>
     </div>

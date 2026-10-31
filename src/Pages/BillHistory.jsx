@@ -4,6 +4,8 @@ import { ArrowLeft, ClipboardList, Eye, Search, RefreshCw, ChevronLeft, ChevronR
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
+import AppFooter from "../Components/Layout/AppFooter";
+
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8001").replace(/\/+$/, "");
 const PAGE_SIZE = 10;
@@ -323,6 +325,7 @@ export default function BillHistory() {
               </div>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

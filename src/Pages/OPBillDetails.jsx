@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import {
   ArrowLeft,
   AlertCircle,
@@ -1249,6 +1249,7 @@ export default function OPBillDetails() {
               </article>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

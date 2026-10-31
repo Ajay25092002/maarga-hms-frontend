@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, Save, AlertCircle } from "lucide-react";
+import AppFooter from "../Components/Layout/AppFooter";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
@@ -399,7 +400,7 @@ export default function EditRole() {
               </section>
 
               {/* Actions */}
-              <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+              <div className="flex flex-col-reverse justify-end gap-3 pb-4  sm:flex-row">
                 <Link
                   to={`/settings/roles/${roleId}`}
                   className="rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-300"
@@ -418,6 +419,7 @@ export default function EditRole() {
               </div>
             </form>
           ) : null}
+          <AppFooter />
         </main>
       </div>
     </div>

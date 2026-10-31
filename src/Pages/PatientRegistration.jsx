@@ -1,6 +1,7 @@
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import PatientRegistrationForm from "../Components/PatientRegistration/PatientRegistrationForm";
+import AppFooter from "../Components/Layout/AppFooter";
 
 export default function PatientRegistration() {
   return (
@@ -19,6 +20,7 @@ export default function PatientRegistration() {
 
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
           <PatientRegistrationForm />
+          <AppFooter />
         </main>
       </div>
     </div>

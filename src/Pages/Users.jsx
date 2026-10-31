@@ -13,7 +13,7 @@ import {
   Users as UsersIcon,
   UserX,
 } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
@@ -557,6 +557,7 @@ export default function Users() {
               </div>
             </section>
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

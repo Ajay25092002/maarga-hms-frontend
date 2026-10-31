@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, Save, AlertCircle } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
@@ -402,6 +402,7 @@ export default function CreateRole() {
               </button>
             </div>
           </form>
+          <AppFooter />
         </main>
       </div>
     </div>

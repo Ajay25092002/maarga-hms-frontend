@@ -6,6 +6,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
 import PaymentForm from "../Components/Payments/PaymentForm";
 import { paymentService } from "../Services/paymentService";
+import AppFooter from "../Components/Layout/AppFooter";
 import {
   getBillBalance,
   getErrorMessage,
@@ -229,6 +230,7 @@ export default function CreatePayment() {
             onCancel={() => navigate("/payments")}
             dark={dark}
           />
+          <AppFooter />
         </main>
       </div>
     </div>

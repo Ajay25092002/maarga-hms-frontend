@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
@@ -220,6 +220,7 @@ export default function Payments() {
             onRetry={() => setRefreshKey((value) => value + 1)}
             dark={dark}
           />
+          <AppFooter />
         </main>
       </div>
     </div>

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, Pencil } from "lucide-react";
+import AppFooter from "../Components/Layout/AppFooter";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
@@ -195,6 +196,7 @@ export default function EditUser() {
               </div>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

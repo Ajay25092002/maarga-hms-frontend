@@ -18,7 +18,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
@@ -676,7 +676,7 @@ export default function PaymentRefunds() {
                 </div>
               </div>
             </section>
-
+{/* 
             <div className="mt-3 flex justify-end">
               <button
                 type="button"
@@ -690,8 +690,9 @@ export default function PaymentRefunds() {
                 />
                 Refresh data
               </button>
-            </div>
+            </div> */}
           </div>
+          <AppFooter />
         </main>
       </div>
 

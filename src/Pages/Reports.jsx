@@ -14,6 +14,7 @@ import TopNavbar from "../Components/Layout/TopNavbar";
 import ReportFilters from "../Components/Reports/ReportFilters";
 import ReportTable from "../Components/Reports/ReportTable";
 import { useAuth } from "../Context/AuthContext";
+import AppFooter from "../Components/Layout/AppFooter";
 
 const API_BASE = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001"
@@ -444,11 +445,8 @@ export default function Reports() {
             onPageChange={setPage}
             loading={loading}
           />
-          <p className="text-xs text-slate-400">
-            Internal database IDs are not displayed. Bill numbers, OP/IP
-            numbers, patient numbers, and receipt/refund numbers are shown where
-            relevant.
-          </p>
+         
+          <AppFooter />
         </main>
       </div>
       <style>{`@media print { body { background: white !important; } aside, nav, button, input, select, form { display: none !important; } main { padding: 0 !important; } .lg\\:ml-\\[260px\\] { margin-left: 0 !important; } }`}</style>

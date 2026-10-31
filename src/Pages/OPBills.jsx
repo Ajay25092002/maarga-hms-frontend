@@ -5,6 +5,7 @@ import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import OPBillsList from "../Components/OPBilling/OPBillsList";
 import { useTheme } from "../Context/ThemeContext";
+import AppFooter from "../Components/Layout/AppFooter";
 
 export default function OPBills() {
   const navigate = useNavigate();
@@ -64,6 +65,7 @@ export default function OPBills() {
               onViewBill={handleViewBill}
             />
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

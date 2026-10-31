@@ -519,7 +519,7 @@ export default function PatientRegistrationForm() {
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/80 pt-4 dark:border-slate-700">
+        <div className="mt-5 mb-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/80 pt-4 dark:border-slate-700">
          
 
           <div className="ml-auto flex flex-wrap items-center gap-3">

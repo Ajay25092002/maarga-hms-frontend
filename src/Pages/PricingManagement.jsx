@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import { useTheme } from "../Context/ThemeContext";
 
 import ServiceGroupsTab from "../Components/Pricing/ServiceGroupsTab";
@@ -168,6 +168,7 @@ export default function PricingManagement() {
               </div>
             </div>
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

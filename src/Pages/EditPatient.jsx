@@ -1,6 +1,7 @@
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import EditPatientForm from "../Components/Patients/EditPatient";
+import AppFooter from "../Components/Layout/AppFooter";
 
 export default function EditPatient() {
   return (
@@ -23,6 +24,7 @@ export default function EditPatient() {
         {/* Edit Patient Content */}
         <main className="min-w-0 px-4 py-5 sm:px-5 lg:px-6">
           <EditPatientForm />
+          <AppFooter />
         </main>
       </div>
     </div>

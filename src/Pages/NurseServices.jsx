@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReceiptText } from "lucide-react";
-
+import AppFooter from "../Components/Layout/AppFooter";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import NurseBillsList from "../Components/IPBilling/NurseBillsList";
@@ -260,6 +260,7 @@ export default function NurseServices() {
               onViewBill={handleViewBill}
             />
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   UserRound,
 } from "lucide-react";
+import AppFooter from "../Components/Layout/AppFooter";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
 
@@ -1636,6 +1637,7 @@ export default function IPBillDetails() {
               </article>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

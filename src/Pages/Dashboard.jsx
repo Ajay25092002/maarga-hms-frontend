@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
 import { useTheme } from "../Context/ThemeContext";
+import AppFooter from "../Components/Layout/AppFooter";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -862,16 +864,11 @@ export default function Dashboard() {
                   )}
                 </Panel>
 
-                <p
-                  className={`text-right text-xs ${dark ? "text-slate-500" : "text-gray-400"}`}
-                >
-                  {dashboard.generated_at
-                    ? `Dashboard data date: ${formatDate(dashboard.generated_at)}`
-                    : ""}
-                </p>
+             
               </>
             )}
           </div>
+            <AppFooter />
         </main>
       </div>
     </div>
