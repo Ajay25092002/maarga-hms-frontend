@@ -8,7 +8,7 @@ import {
   BedDouble,
   CalendarDays,
   CreditCard,
-  Download ,
+  Download,
   ReceiptText,
   RefreshCw,
   UserRound,
@@ -82,6 +82,9 @@ const getPatientName = (bill) =>
 
 const getPatientId = (bill) =>
   bill?.patient_id ?? bill?.patient?.patient_id ?? "—";
+
+// TEMPORARY: Allow editing discharged IP bills for selected patients.
+const TEMP_IP_EDIT_PATIENT_IDS = ["PAT-5B5F77F3F094", "PAT-3E2E434879E3","PAT-C31887297772","PAT-7091D17DF61E"];
 
 const getPaid = (bill) => Number(bill?.amount_paid ?? 0);
 
@@ -707,7 +710,8 @@ export default function IPBillDetails() {
                   Back to IP Bills
                 </button>
 
-                {bill && !bill.discharge_date && (
+                {/* production code */}
+                {/* {bill && !bill.discharge_date && (
                   <button
                     type="button"
                     onClick={() => navigate(`/ip-billing/${billId}/edit`)}
@@ -716,7 +720,25 @@ export default function IPBillDetails() {
                   >
                     Edit Bill
                   </button>
-                )}
+                )} */}
+
+
+                {/* Temporary: Allow editing discharged IP bills for selected patients. */}
+
+                {bill &&
+                  (!bill.discharge_date ||
+                    TEMP_IP_EDIT_PATIENT_IDS.includes(
+                      String(getPatientId(bill)),
+                    )) && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/ip-billing/${billId}/edit`)}
+                      disabled={loading || !bill || Boolean(error)}
+                      className="inline-flex h-10 items-center gap-2 rounded-md border border-[#3E439C] px-4 text-sm font-semibold text-[#3E439C] disabled:opacity-60"
+                    >
+                      Edit Bill
+                    </button>
+                  )}
 
                 <button
                   type="button"

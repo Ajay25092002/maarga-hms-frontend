@@ -29,6 +29,9 @@ const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
+// TEMPORARY: Allow editing discharged IP bills for selected patients.
+const TEMP_IP_EDIT_PATIENT_IDS = ["PAT-5B5F77F3F094", "PAT-3E2E434879E3","PAT-C31887297772","PAT-7091D17DF61E"];
+
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -265,7 +268,26 @@ function BillEditScreen({ expectedType }) {
           );
         }
 
-        if (expectedType === "IP" && b.discharge_date) {
+        // production: Disallow editing discharged IP bills.
+
+        // if (expectedType === "IP" && b.discharge_date) {
+        //   throw new Error(
+        //     "This IP bill has a discharge date and can no longer be edited.",
+        //   );
+        // }
+
+
+        // temporary: Allow editing discharged IP bills for selected patients.
+
+        const isTemporaryEditAllowed = TEMP_IP_EDIT_PATIENT_IDS.includes(
+          String(b.patient_id || ""),
+        );
+
+        if (
+          expectedType === "IP" &&
+          b.discharge_date &&
+          !isTemporaryEditAllowed
+        ) {
           throw new Error(
             "This IP bill has a discharge date and can no longer be edited.",
           );
