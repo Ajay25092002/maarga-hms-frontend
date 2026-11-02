@@ -80,6 +80,12 @@ const REPORTS = [
     description: "Patient acquisition source summary",
     icon: Users,
   },
+  {
+    key: "accrued-revenue",
+    label: "Accrued Revenue",
+    description: "Revenue based on bill-item service dates",
+    icon: IndianRupee,
+  },
 ];
 const BASE_FILTERS = {
   date_from: "",
@@ -92,6 +98,9 @@ const BASE_FILTERS = {
   service: "",
   service_group: "",
   status: "",
+  year: String(new Date().getFullYear()),
+  month: String(new Date().getMonth() + 1),
+  based_on: "patient-wise",
 };
 
 // Use the hospital's Indian calendar day regardless of the browser timezone.
@@ -112,7 +121,15 @@ function todayIndia() {
 }
 
 function createDefaultFilters() {
-  return { ...BASE_FILTERS, ...getDefaultDateRange() };
+  const currentIndiaDate = todayIndia();
+  const [year, month] = currentIndiaDate.split("-");
+  return {
+    ...BASE_FILTERS,
+    ...getDefaultDateRange(),
+    year,
+    month: String(Number(month)),
+    based_on: "patient-wise",
+  };
 }
 
 async function readResponse(response) {
@@ -168,9 +185,23 @@ function formatCsvValue(value, columnName = "") {
   return String(value);
 }
 
-function downloadCsv(name, items) {
+function downloadCsv(name, items, options = {}) {
   const rows = items.map(({ report_date, ...rest }) => rest);
-  const columns = rows.length ? Object.keys(rows[0]) : [];
+  const columns = rows.length
+    ? Object.keys(rows[0])
+    : options.appendMonthlyTotal
+      ? options.basedOn === "bill-wise"
+        ? ["Bill Number", "Bill Type", "OP/IP Number", "Patient Number", "Patient Name", "Mobile", "Gender", "Bill Date", "Admission Date", "Discharge Date", "Services", "Service Item Count", "Amount", "Discount", "Net Amount"]
+        : ["Patient Number", "Patient Name", "Mobile", "Gender", "Number of Bills", "Bill Numbers", "Amount", "Discount", "Net Amount"]
+      : [];
+  if (options.appendMonthlyTotal && columns.length) {
+    const totalRow = Object.fromEntries(columns.map((column) => [column, ""]));
+    totalRow[columns[0]] = "MONTHLY TOTAL";
+    totalRow["Amount"] = options.totals?.Amount ?? 0;
+    totalRow["Discount"] = options.totals?.Discount ?? 0;
+    totalRow["Net Amount"] = options.totals?.["Net Amount"] ?? 0;
+    rows.push(totalRow);
+  }
   const escape = (value, columnName = "") => {
     const raw = formatCsvValue(value, columnName);
     return `"${raw.replaceAll('"', '""')}"`;
@@ -203,6 +234,7 @@ export default function Reports() {
   const [appliedFilters, setAppliedFilters] = useState(createDefaultFilters);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [reportTotals, setReportTotals] = useState({});
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -218,7 +250,10 @@ export default function Reports() {
       setLoading(true);
       setError("");
       try {
-        const query = queryString(currentFilters, {
+        const requestFilters = report === "accrued-revenue"
+          ? { ...currentFilters, date_from: "", date_to: "" }
+          : currentFilters;
+        const query = queryString(requestFilters, {
           page: currentPage,
           page_size: pageSize,
         });
@@ -230,10 +265,12 @@ export default function Reports() {
         );
         setItems(Array.isArray(data.items) ? data.items : []);
         setTotal(Number(data.total || 0));
+        setReportTotals(data.totals || {});
       } catch (err) {
         setError(err.message || "Unable to load this report.");
         setItems([]);
         setTotal(0);
+        setReportTotals({});
       } finally {
         setLoading(false);
       }
@@ -251,20 +288,35 @@ export default function Reports() {
     setFilters(defaults);
     setAppliedFilters(defaults);
     setPage(1);
+    setReportTotals({});
+    setItems([]);
+    setTotal(0);
     setError("");
   }
   function applyFilters() {
-    if (!filters.date_from || !filters.date_to) {
-      setError("Select both a From date and a To date.");
-      return;
-    }
-    if (filters.date_from > filters.date_to) {
-      setError("The From date must be on or before the To date.");
-      return;
-    }
-    if (filters.date_from > todayIndia() || filters.date_to > todayIndia()) {
-      setError("Future report dates are not allowed.");
-      return;
+    if (activeReport === "accrued-revenue") {
+      if (!filters.year || !filters.month) {
+        setError("Select both a year and a month.");
+        return;
+      }
+      const selectedPeriod = `${filters.year}-${String(filters.month).padStart(2, "0")}`;
+      if (selectedPeriod > todayIndia().slice(0, 7)) {
+        setError("Future report months are not allowed.");
+        return;
+      }
+    } else {
+      if (!filters.date_from || !filters.date_to) {
+        setError("Select both a From date and a To date.");
+        return;
+      }
+      if (filters.date_from > filters.date_to) {
+        setError("The From date must be on or before the To date.");
+        return;
+      }
+      if (filters.date_from > todayIndia() || filters.date_to > todayIndia()) {
+        setError("Future report dates are not allowed.");
+        return;
+      }
     }
     setError("");
     setPage(1);
@@ -278,34 +330,50 @@ export default function Reports() {
     setError("");
   }
 
-  const hasValidExportDateRange = Boolean(
-    appliedFilters.date_from &&
-    appliedFilters.date_to &&
-    appliedFilters.date_from <= appliedFilters.date_to &&
-    appliedFilters.date_to <= todayIndia(),
-  );
+  const hasValidExportFilters = activeReport === "accrued-revenue"
+    ? Boolean(
+        appliedFilters.year &&
+        appliedFilters.month &&
+        `${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` <= todayIndia().slice(0, 7),
+      )
+    : Boolean(
+        appliedFilters.date_from &&
+        appliedFilters.date_to &&
+        appliedFilters.date_from <= appliedFilters.date_to &&
+        appliedFilters.date_to <= todayIndia(),
+      );
 
   async function exportReport() {
-    if (!appliedFilters.date_from || !appliedFilters.date_to) {
-      setError(
-        "Select both a From date and a To date, then apply the filters before downloading.",
-      );
-      return;
-    }
-    if (appliedFilters.date_from > todayIndia() || appliedFilters.date_to > todayIndia()) {
-      setError("Future report dates are not allowed.");
-      return;
-    }
-    if (appliedFilters.date_from > appliedFilters.date_to) {
-      setError(
-        "The From date must be on or before the To date. Apply the corrected date range before downloading.",
-      );
-      return;
+    if (activeReport === "accrued-revenue") {
+      if (!appliedFilters.year || !appliedFilters.month) {
+        setError("Select a year and month, then apply the filters before downloading.");
+        return;
+      }
+      if (`${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` > todayIndia().slice(0, 7)) {
+        setError("Future report months are not allowed.");
+        return;
+      }
+    } else {
+      if (!appliedFilters.date_from || !appliedFilters.date_to) {
+        setError("Select both a From date and a To date, then apply the filters before downloading.");
+        return;
+      }
+      if (appliedFilters.date_from > todayIndia() || appliedFilters.date_to > todayIndia()) {
+        setError("Future report dates are not allowed.");
+        return;
+      }
+      if (appliedFilters.date_from > appliedFilters.date_to) {
+        setError("The From date must be on or before the To date. Apply the corrected date range before downloading.");
+        return;
+      }
     }
     setDownloading(true);
     setError("");
     try {
-      const query = queryString(appliedFilters, {
+      const exportFilters = activeReport === "accrued-revenue"
+        ? { ...appliedFilters, date_from: "", date_to: "" }
+        : appliedFilters;
+      const query = queryString(exportFilters, {
         export_all: "true",
         page: 1,
         page_size: 200,
@@ -320,6 +388,11 @@ export default function Reports() {
         REPORTS.find((report) => report.key === activeReport)?.label ||
           activeReport,
         data.items || [],
+        {
+          appendMonthlyTotal: activeReport === "accrued-revenue",
+          totals: data.totals || {},
+          basedOn: appliedFilters.based_on,
+        },
       );
     } catch (err) {
       setError(err.message || "Unable to download this report.");
@@ -358,7 +431,7 @@ export default function Reports() {
               {canDownload && (
                 <button
                   onClick={exportReport}
-                  disabled={downloading || loading || !hasValidExportDateRange}
+                  disabled={downloading || loading || !hasValidExportFilters}
                   className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#3E439C] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#30357d] disabled:opacity-60"
                 >
                   <Download size={16} />
@@ -423,10 +496,27 @@ export default function Reports() {
             onReset={resetFilters}
             loading={loading}
           />
-          {!hasValidExportDateRange && (
+          {activeReport === "accrued-revenue" && (
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                { label: "Monthly Total Amount", value: reportTotals.Amount },
+                { label: "Monthly Total Discount", value: reportTotals.Discount },
+                { label: "Monthly Total Net Amount", value: reportTotals["Net Amount"] },
+              ].map((card) => (
+                <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{card.label}</p>
+                  <p className="mt-2 text-xl font-bold tabular-nums text-slate-800 dark:text-slate-100">
+                    ₹{Number(card.value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              ))}
+            </section>
+          )}
+          {!hasValidExportFilters && (
             <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-              To download, select both dates in a valid range and click Apply
-              filters. The default range is the last 7 calendar days.
+              {activeReport === "accrued-revenue"
+                ? "Select a valid year and month, then click Apply filters before downloading."
+                : "To download, select both dates in a valid range and click Apply filters. The default range is the last 7 calendar days."}
             </p>
           )}
           {error && (

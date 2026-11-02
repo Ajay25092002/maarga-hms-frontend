@@ -1,21 +1,25 @@
-
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 function display(value, key) {
   if (value === null || value === undefined || value === "") return "—";
 
-  const isAdmissionOrDischargeDate = /^(admission|discharge) date$/i.test(String(key || "").trim());
+  const isAdmissionOrDischargeDate = /^(admission|discharge) date$/i.test(
+    String(key || "").trim(),
+  );
 
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value)) {
     const dateOnly = value.slice(0, 10);
     if (isAdmissionOrDischargeDate || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       const [year, month, day] = dateOnly.split("-").map(Number);
-      return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
+      return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString(
+        "en-IN",
+        {
+          timeZone: "Asia/Kolkata",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        },
+      );
     }
 
     const date = new Date(value);
@@ -34,16 +38,19 @@ function display(value, key) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const [year, month, day] = value.split("-").map(Number);
 
-    return new Date(
-      Date.UTC(year, month - 1, day, 12),
-    ).toLocaleDateString("en-IN", {
-      timeZone: "Asia/Kolkata",
-    });
+    return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString(
+      "en-IN",
+      {
+        timeZone: "Asia/Kolkata",
+      },
+    );
   }
 
   if (
     typeof value === "number" &&
-    /amount|paid|refunded|outstanding|deposit|quantity/i.test(String(key))
+    /amount|discount|net|paid|refunded|outstanding|deposit|quantity/i.test(
+      String(key),
+    )
   ) {
     return value.toLocaleString("en-IN", {
       minimumFractionDigits: 2,
