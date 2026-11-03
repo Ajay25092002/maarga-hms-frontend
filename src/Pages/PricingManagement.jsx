@@ -6,6 +6,7 @@ import {
   BedDouble,
   IndianRupee,
   FileSpreadsheet,
+  Building2,
 } from "lucide-react";
 import AppSidebar from "../Components/Layout/AppSidebar";
 import TopNavbar from "../Components/Layout/TopNavbar";
@@ -18,6 +19,7 @@ import DoctorsTab from "../Components/Pricing/DoctorsTab";
 import RoomTypesTab from "../Components/Pricing/RoomTypesTab";
 import ServicePricingTab from "../Components/Pricing/ServicePricingTab";
 import PricingImportTab from "../Components/Pricing/PricingImportTab";
+import SponsorsTab from "../Components/Pricing/SponsorsTab";
 
 const pricingTabs = [
   {
@@ -49,6 +51,12 @@ const pricingTabs = [
     label: "Service Pricing",
     icon: IndianRupee,
     component: ServicePricingTab,
+  },
+  {
+    id: "sponsors",
+    label: "Sponsors",
+    icon: Building2,
+    component: SponsorsTab,
   },
   {
     id: "import",

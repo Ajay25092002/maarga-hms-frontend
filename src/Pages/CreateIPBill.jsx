@@ -28,6 +28,7 @@ import FullPageLoader from "../Components/Common/FullPageLoader";
 import { useToast } from "../Components/Common/useToast";
 
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+import SponsorSelect from "../Components/Common/SponsorSelect";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -265,6 +266,8 @@ export default function CreateIPBill() {
   const [categories, setCategories] = useState([createCategory()]);
 
   const [notes, setNotes] = useState("");
+  const [sponsorId, setSponsorId] = useState("");
+  const [sponsorName, setSponsorName] = useState("");
 
   const [notice, setNotice] = useState("");
 
@@ -1283,6 +1286,8 @@ export default function CreateIPBill() {
       bill_type: "IP",
 
       patient_id: selectedPatient.patient_id,
+      sponsor_id: Number(sponsorId),
+      sponsor_name: sponsorName,
 
       admission_date: `${admissionDate}T00:00:00`,
 
@@ -1444,6 +1449,17 @@ export default function CreateIPBill() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <div>
+                    <SponsorSelect
+                      value={sponsorId}
+                      onChange={(id, name) => {
+                        setSponsorId(id);
+                        setSponsorName(name);
+                      }}
+                      dark={dark}
+                    />
+                  </div>
+
                   <div className="relative">
                     <label className={labelClass}>Search Patient *</label>
 

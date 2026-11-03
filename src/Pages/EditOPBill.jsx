@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AppFooter from "../Components/Layout/AppFooter";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -21,10 +21,14 @@ import { useTheme } from "../Context/ThemeContext";
 import { useToast } from "../Components/Common/useToast";
 
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+import SponsorSelect from "../Components/Common/SponsorSelect";
 
 const API = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
+
+const FRONTEND_RATE_SERVICE_NAMES = new Set(["RETRIEVAL CHARGES", "LAUNDRY CHARGES", "MISCELLANEOUS"]);
+const isFrontendRateService = name => FRONTEND_RATE_SERVICE_NAMES.has(String(name || "").trim().toUpperCase());
 
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -131,6 +135,41 @@ function BillEditScreen({ expectedType }) {
   const panel = dark ? "bg-[#171827]" : "bg-white";
 
   const input = `h-10 w-full rounded-md border px-3 text-sm outline-none focus:border-[#3E439C] ${dark ? "border-slate-700 bg-[#171827] text-slate-100" : "border-slate-200 bg-white text-slate-800"}`;
+
+  const fetchOPServices = useCallback(async (search, { signal } = {}) => {
+    const params = new URLSearchParams({
+      bill_type: "OP",
+      search: String(search || "").trim(),
+      page: "1",
+      page_size: "10",
+      is_active: "true",
+    });
+
+    const data = await api(`/api/services?${params.toString()}`, { signal });
+    const results = Array.isArray(data)
+      ? data
+      : data?.items || data?.results || [];
+
+    const activeResults = results.filter(
+      (service) =>
+        service.is_active !== false && service.available_for_op !== false,
+    );
+
+    setServices((current) => {
+      const byId = new Map(
+        current.map((service) => [
+          String(service.id ?? service.service_id),
+          service,
+        ]),
+      );
+      activeResults.forEach((service) => {
+        byId.set(String(service.id ?? service.service_id), service);
+      });
+      return Array.from(byId.values());
+    });
+
+    return activeResults;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -289,13 +328,16 @@ function BillEditScreen({ expectedType }) {
 
     updateItem(key, {
       service_id: String(id),
-
       service_name: service.name || service.service_name,
-
       group_name: service.service_group_name || service.group_name || "",
-
-      priceLoading: true,
+      priceLoading: !isFrontendRateService(service.name || service.service_name),
+      ...(isFrontendRateService(service.name || service.service_name) ? { rate: "" } : {}),
     });
+
+    if (isFrontendRateService(service.name || service.service_name)) {
+      updateItem(key, { priceLoading: false, rate: "" });
+      return;
+    }
 
     try {
       const params = new URLSearchParams({
@@ -344,7 +386,8 @@ function BillEditScreen({ expectedType }) {
           !i.service_id ||
           !i.service_date ||
           Number(i.quantity) <= 0 ||
-          Number(i.discount_amount) < 0,
+          Number(i.discount_amount) < 0 ||
+          (isFrontendRateService(i.service_name) && (String(i.rate).trim() === "" || !Number.isFinite(Number(i.rate)) || Number(i.rate) < 0)),
       )
     ) {
       showToast({
@@ -366,6 +409,8 @@ function BillEditScreen({ expectedType }) {
         bill_type: bill.bill_type,
 
         patient_id: bill.patient_id,
+        sponsor_id: bill.sponsor_id ? Number(bill.sponsor_id) : null,
+        sponsor_name: bill.sponsor_name_snapshot || "",
 
         bill_date: bill.bill_date,
 
@@ -399,6 +444,8 @@ function BillEditScreen({ expectedType }) {
           service_date: i.service_date,
 
           quantity: Number(i.quantity),
+
+          rate: Number(i.rate || 0),
 
           discount_amount: Number(i.discount_amount || 0),
 
@@ -484,6 +531,7 @@ function BillEditScreen({ expectedType }) {
           ) : (
             bill && (
               <form onSubmit={save} className="space-y-5">
+                <section className={`border-b pb-5 ${border}`}><div className="max-w-md"><SponsorSelect value={bill.sponsor_id || ""} onChange={(value, name) => setBill(current => ({ ...current, sponsor_id: value, sponsor_name_snapshot: name }))} dark={dark} /></div></section>
                 {
                   /* Patient & Provider Details — editability controlled by DISABLED_OP_EDIT_FIELDS */
                 }
@@ -810,16 +858,7 @@ function BillEditScreen({ expectedType }) {
                                           : "",
                                       )
                                     }
-                                    fetchOptions={async (search) =>
-                                      services.filter((s) =>
-                                        String(s.name ?? s.service_name ?? "")
-                                          .toLowerCase()
-
-                                          .includes(
-                                            String(search ?? "").toLowerCase(),
-                                          ),
-                                      )
-                                    }
+                                    fetchOptions={fetchOPServices}
                                     getOptionLabel={(s) =>
                                       s.name || s.service_name || ""
                                     }
@@ -864,15 +903,11 @@ function BillEditScreen({ expectedType }) {
                               </td>
 
                               <td className="px-3 py-2.5 align-middle">
-                                <div
-                                  className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}
-                                >
-                                  <span className="truncate">
-                                    {item.priceLoading
-                                      ? "Loading…"
-                                      : money(rate)}
-                                  </span>
-                                </div>
+                                {isFrontendRateService(item.service_name) ? (
+                                  <input type="number" min="0" step="0.01" className={`${input} text-right`} value={item.rate} onChange={e => updateItem(item.key, { rate: e.target.value })} aria-label={`Rate for ${item.service_name}`} required />
+                                ) : (
+                                  <div className={`flex h-10 w-full min-w-0 items-center justify-end overflow-hidden rounded-md border px-2 text-sm ${border} ${muted} ${dark ? "bg-slate-800/70" : "bg-slate-50"}`}><span className="truncate">{item.priceLoading ? "Loading…" : money(rate)}</span></div>
+                                )}
                               </td>
 
                               <td

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   UserRound,
 } from "lucide-react";
+
 import AppFooter from "../Components/Layout/AppFooter";
 
 import AppSidebar from "../Components/Layout/AppSidebar";
@@ -80,11 +81,11 @@ const getErrorMessage = (data, fallback) => {
 const getPatientName = (bill) =>
   bill?.patient_name ?? bill?.patient?.name ?? bill?.patient?.full_name ?? "—";
 
+const getSponsorName = (bill) =>
+  bill?.sponsor_name_snapshot || "—";
+
 const getPatientId = (bill) =>
   bill?.patient_id ?? bill?.patient?.patient_id ?? "—";
-
-// TEMPORARY: Allow editing discharged IP bills for selected patients.
-const TEMP_IP_EDIT_PATIENT_IDS = ["PAT-5B5F77F3F094", "PAT-3E2E434879E3","PAT-C31887297772","PAT-7091D17DF61E"];
 
 const getPaid = (bill) => Number(bill?.amount_paid ?? 0);
 
@@ -125,83 +126,13 @@ const getStatus = (bill) => {
 
 /**
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  * Resolves a service-group name from common API response shapes.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
  *
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  * If the API returns only a group ID, the backend must also return
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  * the corresponding group name for the frontend to display it.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
  */
 
@@ -581,24 +512,30 @@ export default function IPBillDetails() {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/bills/${encodeURIComponent(billId)}/ip-pdf`,
+
         {
           method: "GET",
+
           credentials: "include",
+
           headers: { Accept: "application/pdf" },
         },
       );
 
       if (!response.ok) {
         const contentType = response.headers.get("content-type") || "";
+
         let message = `Unable to generate IP PDF (HTTP ${response.status}).`;
 
         if (contentType.includes("application/json")) {
           message = getErrorMessage(
             await response.json().catch(() => null),
+
             message,
           );
         } else {
           const bodyText = await response.text().catch(() => "");
+
           if (bodyText) message = bodyText;
         }
 
@@ -618,24 +555,33 @@ export default function IPBillDetails() {
       }
 
       const patientName = getPatientName(bill);
+
       const billNumber = bill.bill_number ?? bill.id ?? billId;
 
       const safePatientName = String(patientName || "Patient")
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .replace(/[<>:"\/\\|?*\u0000-\u001F]/g, "-")
+
         .trim();
 
       const safeBillNumber = String(billNumber)
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+        .replace(/[<>:"\/\\|?*\u0000-\u001F]/g, "-")
+
         .trim();
 
       const fileName = `PT. ${safePatientName} BILL IP-Bill-${safeBillNumber}.pdf`;
+
       const pdfUrl = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
 
       link.href = pdfUrl;
+
       link.download = fileName;
+
       document.body.appendChild(link);
+
       link.click();
+
       link.remove();
 
       window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
@@ -711,7 +657,28 @@ export default function IPBillDetails() {
                 </button>
 
                 {/* production code */}
+
                 {/* {bill && !bill.discharge_date && (
+
+                  <button
+
+                    type="button"
+
+                    onClick={() => navigate(`/ip-billing/${billId}/edit`)}
+
+                    disabled={loading || !bill || Boolean(error)}
+
+                    className="inline-flex h-10 items-center gap-2 rounded-md border border-[#3E439C] px-4 text-sm font-semibold text-[#3E439C] disabled:opacity-60"
+
+                  >
+
+                    Edit Bill
+
+                  </button>
+
+                )} */}
+
+                {bill && !bill.discharge_date && (
                   <button
                     type="button"
                     onClick={() => navigate(`/ip-billing/${billId}/edit`)}
@@ -720,25 +687,7 @@ export default function IPBillDetails() {
                   >
                     Edit Bill
                   </button>
-                )} */}
-
-
-                {/* Temporary: Allow editing discharged IP bills for selected patients. */}
-
-                {bill &&
-                  (!bill.discharge_date ||
-                    TEMP_IP_EDIT_PATIENT_IDS.includes(
-                      String(getPatientId(bill)),
-                    )) && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/ip-billing/${billId}/edit`)}
-                      disabled={loading || !bill || Boolean(error)}
-                      className="inline-flex h-10 items-center gap-2 rounded-md border border-[#3E439C] px-4 text-sm font-semibold text-[#3E439C] disabled:opacity-60"
-                    >
-                      Edit Bill
-                    </button>
-                  )}
+                )}
 
                 <button
                   type="button"
@@ -887,6 +836,12 @@ export default function IPBillDetails() {
                     <DetailField
                       label="Patient ID / UHID"
                       value={getPatientId(bill)}
+                      dark={dark}
+                    />
+
+                    <DetailField
+                      label="Sponsor"
+                      value={getSponsorName(bill)}
                       dark={dark}
                     />
 
@@ -1659,6 +1614,7 @@ export default function IPBillDetails() {
               </article>
             )}
           </div>
+
           <AppFooter />
         </main>
       </div>

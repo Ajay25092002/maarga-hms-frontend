@@ -17,6 +17,7 @@ import {
 
 import AppSidebar from "../Components/Layout/AppSidebar";
 import SearchableDropdown from "../Components/Common/SearchableDropdown";
+import SponsorSelect from "../Components/Common/SponsorSelect";
 import TopNavbar from "../Components/Layout/TopNavbar";
 
 import { useTheme } from "../Context/ThemeContext";
@@ -29,6 +30,9 @@ import { useToast } from "../Components/Common/useToast";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001";
+
+const FRONTEND_RATE_SERVICE_NAMES = new Set(["RETRIEVAL CHARGES", "LAUNDRY CHARGES", "MISCELLANEOUS"]);
+const isFrontendRateService = name => FRONTEND_RATE_SERVICE_NAMES.has(String(name || "").trim().toUpperCase());
 
 const today = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
@@ -136,6 +140,8 @@ export default function CreateOPBill() {
   const [mastersError, setMastersError] = useState("");
 
   const [billDate, setBillDate] = useState(today());
+  const [sponsorId, setSponsorId] = useState("");
+  const [sponsorName, setSponsorName] = useState("");
 
   // Doctor and psychologist details
 
@@ -371,6 +377,10 @@ export default function CreateOPBill() {
     const service = services.find(
       (entry) => String(recordId(entry)) === String(serviceId),
     );
+    if (isFrontendRateService(recordName(service))) {
+      setItems(current => current.map(item => item.id === itemId ? { ...item, service_id: String(serviceId), description: recordName(service), rate: "", priceLoading: false, priceError: "" } : item));
+      return;
+    }
     setItems((current) =>
       current.map((item) =>
         item.id === itemId
@@ -613,7 +623,8 @@ export default function CreateOPBill() {
         Number(item.quantity) <= 0 ||
         item.rate === "" ||
         !Number.isFinite(Number(item.rate)) ||
-        Number(item.rate) < 0,
+        Number(item.rate) < 0 ||
+        (isFrontendRateService(item.description) && String(item.rate).trim() === ""),
     );
 
     if (hasInvalidItem) {
@@ -699,6 +710,8 @@ export default function CreateOPBill() {
       bill_type: "OP",
 
       patient_id: selectedPatient.patient_id,
+      sponsor_id: Number(sponsorId),
+      sponsor_name: sponsorName,
       rate_category: rateCategory, // Added
 
       // Doctor and psychologist information
@@ -720,6 +733,7 @@ export default function CreateOPBill() {
         service_id: Number(item.service_id),
         service_date: item.service_date || billDate,
         quantity: Number(item.quantity),
+        rate: Number(item.rate),
         discount_amount: Number(item.discount_amount || 0),
       })),
     };
@@ -878,6 +892,10 @@ export default function CreateOPBill() {
             )}
 
             <form onSubmit={handleGenerateBill} className="space-y-7">
+              <section className={`border-b pb-5 ${border}`}><div className="max-w-md"><SponsorSelect value={sponsorId} onChange={(id, name) => {
+      setSponsorId(id);
+      setSponsorName(name);
+    }} dark={dark} /></div></section>
               {/* Patient and provider details */}
 
               <section className={`border-b pb-6 ${border}`}>
@@ -1302,15 +1320,13 @@ export default function CreateOPBill() {
                                 min="0"
                                 step="0.01"
                                 value={item.rate}
-                                readOnly
-                                aria-readonly="true"
-                                placeholder={
-                                  item.priceLoading ? "Loading..." : "—"
-                                }
-                                title="Rate is populated by the backend and cannot be edited."
-                                className={`${inputClass} w-full min-w-0 text-right ${
-                                  dark ? "bg-slate-800/70" : "bg-slate-50"
-                                }`}
+                                required={isFrontendRateService(item.description)}
+                                readOnly={!isFrontendRateService(item.description)}
+                                onChange={event => updateItem(item.id, "rate", event.target.value)}
+                                aria-readonly={!isFrontendRateService(item.description)}
+                                placeholder={item.priceLoading ? "Loading..." : isFrontendRateService(item.description) ? "Enter rate" : "—"}
+                                title={isFrontendRateService(item.description) ? "Enter the rate for this service." : "Rate is populated by the backend."}
+                                className={`${inputClass} w-full min-w-0 text-right ${!isFrontendRateService(item.description) ? (dark ? "bg-slate-800/70" : "bg-slate-50") : ""}`}
                               />
                             </td>
 
