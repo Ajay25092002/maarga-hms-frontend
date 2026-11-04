@@ -48,7 +48,7 @@ function display(value, key) {
 
   if (
     typeof value === "number" &&
-    /amount|discount|net|paid|refunded|outstanding|deposit|quantity/i.test(
+    /amount|discount|net|paid|refunded|outstanding|deposit|quantity|^rate$/i.test(
       String(key),
     )
   ) {
@@ -61,7 +61,17 @@ function display(value, key) {
   return String(value);
 }
 
+const IP_BILLING_COLUMNS = [
+  "Bill Type", "Bill Number", "IP Number", "Bill Date", "Sponsor Name",
+  "Patient ID", "Patient Unique Number", "Patient Name", "Gender", "Age",
+  "Mobile Number", "Service Date", "Service Group", "Service Name",
+  "Quantity", "Rate", "Gross Amount", "Discount Amount", "GST Amount",
+  "Net Amount", "Department", "Doctor Name", "Admission Date",
+  "Discharge Date", "Room Type", "Bed Number", "Bill Notes",
+];
+
 export default function ReportTable({
+  reportType,
   items,
   total,
   page,
@@ -69,9 +79,11 @@ export default function ReportTable({
   onPageChange,
   loading,
 }) {
-  const columns = items.length
-    ? Object.keys(items[0]).filter((key) => key !== "report_date")
-    : [];
+  const columns = reportType === "ip-billing"
+    ? IP_BILLING_COLUMNS
+    : items.length
+      ? Object.keys(items[0]).filter((key) => key !== "report_date")
+      : [];
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
 

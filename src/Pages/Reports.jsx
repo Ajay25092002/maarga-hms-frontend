@@ -35,7 +35,7 @@ const REPORTS = [
   {
     key: "ip-billing",
     label: "IP Billing",
-    description: "Inpatient bills and balances",
+    description: "IP service line items filtered by service date",
     icon: FileSpreadsheet,
   },
   {
@@ -105,10 +105,16 @@ const BASE_FILTERS = {
 
 // Use the hospital's Indian calendar day regardless of the browser timezone.
 function getDefaultDateRange() {
-  const today = new Date(new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date()) + "T12:00:00");
-  const toDateString = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  const today = new Date(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()) + "T12:00:00",
+  );
+  const toDateString = (value) =>
+    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
   const from = new Date(today);
   from.setDate(from.getDate() - 6);
   return { date_from: toDateString(from), date_to: toDateString(today) };
@@ -116,7 +122,10 @@ function getDefaultDateRange() {
 
 function todayIndia() {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(new Date());
 }
 
@@ -146,86 +155,6 @@ function queryString(filters, extra = {}) {
   });
   return params.toString();
 }
-function formatCsvValue(value, columnName = "") {
-  if (value === null || value === undefined) return "";
-
-  const isAdmissionOrDischargeDate = /^(admission|discharge) date$/i.test(
-    String(columnName).trim(),
-  );
-
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value)) {
-    const dateOnly = value.slice(0, 10);
-
-    // Admission and discharge are collected as dates only, never timestamps.
-    if (isAdmissionOrDischargeDate || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [year, month, day] = dateOnly.split("-").map(Number);
-      return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-    }
-
-    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
-    const date = new Date(hasTimezone ? value : `${value}+05:30`);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    }
-  }
-
-  return String(value);
-}
-
-function downloadCsv(name, items, options = {}) {
-  const rows = items.map(({ report_date, ...rest }) => rest);
-  const columns = rows.length
-    ? Object.keys(rows[0])
-    : options.appendMonthlyTotal
-      ? options.basedOn === "bill-wise"
-        ? ["Bill Number", "Bill Type", "OP/IP Number", "Patient Number", "Patient Name", "Mobile", "Gender", "Bill Date", "Admission Date", "Discharge Date", "Services", "Service Item Count", "Amount", "Discount", "Net Amount"]
-        : ["Patient Number", "Patient Name", "Mobile", "Gender", "Number of Bills", "Bill Numbers", "Amount", "Discount", "Net Amount"]
-      : [];
-  if (options.appendMonthlyTotal && columns.length) {
-    const totalRow = Object.fromEntries(columns.map((column) => [column, ""]));
-    totalRow[columns[0]] = "MONTHLY TOTAL";
-    totalRow["Amount"] = options.totals?.Amount ?? 0;
-    totalRow["Discount"] = options.totals?.Discount ?? 0;
-    totalRow["Net Amount"] = options.totals?.["Net Amount"] ?? 0;
-    rows.push(totalRow);
-  }
-  const escape = (value, columnName = "") => {
-    const raw = formatCsvValue(value, columnName);
-    return `"${raw.replaceAll('"', '""')}"`;
-  };
-  const content = [
-    columns.map((key) => escape(key)).join(","),
-    ...rows.map((row) => columns.map((key) => escape(row[key], key)).join(",")),
-  ].join("\r\n");
-  const blob = new Blob(["\uFEFF", content], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")}-report.csv`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
 export default function Reports() {
   const { user } = useAuth();
   const canDownload = user?.permissions?.["reports.download"] === true;
@@ -250,9 +179,10 @@ export default function Reports() {
       setLoading(true);
       setError("");
       try {
-        const requestFilters = report === "accrued-revenue"
-          ? { ...currentFilters, date_from: "", date_to: "" }
-          : currentFilters;
+        const requestFilters =
+          report === "accrued-revenue"
+            ? { ...currentFilters, date_from: "", date_to: "" }
+            : currentFilters;
         const query = queryString(requestFilters, {
           page: currentPage,
           page_size: pageSize,
@@ -330,70 +260,98 @@ export default function Reports() {
     setError("");
   }
 
-  const hasValidExportFilters = activeReport === "accrued-revenue"
-    ? Boolean(
-        appliedFilters.year &&
-        appliedFilters.month &&
-        `${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` <= todayIndia().slice(0, 7),
-      )
-    : Boolean(
-        appliedFilters.date_from &&
-        appliedFilters.date_to &&
-        appliedFilters.date_from <= appliedFilters.date_to &&
-        appliedFilters.date_to <= todayIndia(),
-      );
+  const hasValidExportFilters =
+    activeReport === "accrued-revenue"
+      ? Boolean(
+          appliedFilters.year &&
+          appliedFilters.month &&
+          `${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` <=
+            todayIndia().slice(0, 7),
+        )
+      : Boolean(
+          appliedFilters.date_from &&
+          appliedFilters.date_to &&
+          appliedFilters.date_from <= appliedFilters.date_to &&
+          appliedFilters.date_to <= todayIndia(),
+        );
 
   async function exportReport() {
     if (activeReport === "accrued-revenue") {
       if (!appliedFilters.year || !appliedFilters.month) {
-        setError("Select a year and month, then apply the filters before downloading.");
+        setError(
+          "Select a year and month, then apply the filters before downloading.",
+        );
         return;
       }
-      if (`${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` > todayIndia().slice(0, 7)) {
+      if (
+        `${appliedFilters.year}-${String(appliedFilters.month).padStart(2, "0")}` >
+        todayIndia().slice(0, 7)
+      ) {
         setError("Future report months are not allowed.");
         return;
       }
     } else {
       if (!appliedFilters.date_from || !appliedFilters.date_to) {
-        setError("Select both a From date and a To date, then apply the filters before downloading.");
+        setError(
+          "Select both a From date and a To date, then apply the filters before downloading.",
+        );
         return;
       }
-      if (appliedFilters.date_from > todayIndia() || appliedFilters.date_to > todayIndia()) {
+      if (
+        appliedFilters.date_from > todayIndia() ||
+        appliedFilters.date_to > todayIndia()
+      ) {
         setError("Future report dates are not allowed.");
         return;
       }
       if (appliedFilters.date_from > appliedFilters.date_to) {
-        setError("The From date must be on or before the To date. Apply the corrected date range before downloading.");
+        setError(
+          "The From date must be on or before the To date. Apply the corrected date range before downloading.",
+        );
         return;
       }
     }
     setDownloading(true);
     setError("");
     try {
-      const exportFilters = activeReport === "accrued-revenue"
-        ? { ...appliedFilters, date_from: "", date_to: "" }
-        : appliedFilters;
-      const query = queryString(exportFilters, {
-        export_all: "true",
-        page: 1,
-        page_size: 200,
-      });
-      const data = await readResponse(
-        await fetch(`${API_BASE}/api/reports/${activeReport}?${query}`, {
-          credentials: "include",
-          headers: { Accept: "application/json" },
-        }),
-      );
-      downloadCsv(
-        REPORTS.find((report) => report.key === activeReport)?.label ||
-          activeReport,
-        data.items || [],
+      const exportFilters =
+        activeReport === "accrued-revenue"
+          ? { ...appliedFilters, date_from: "", date_to: "" }
+          : appliedFilters;
+      const query = queryString(exportFilters);
+      const response = await fetch(
+        `${API_BASE}/api/reports/${activeReport}/export?${query}`,
         {
-          appendMonthlyTotal: activeReport === "accrued-revenue",
-          totals: data.totals || {},
-          basedOn: appliedFilters.based_on,
+          credentials: "include",
+          headers: { Accept: "text/csv" },
         },
       );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Unable to download this report.");
+      }
+
+      const blob = await response.blob();
+      const contentDisposition =
+        response.headers.get("Content-Disposition") || "";
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+      const fallbackName = `${(
+        REPORTS.find((report) => report.key === activeReport)?.label ||
+        activeReport
+      )
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")}-report.csv`;
+      const filename = filenameMatch?.[1] || fallbackName;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       setError(err.message || "Unable to download this report.");
     } finally {
@@ -485,7 +443,8 @@ export default function Reports() {
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              Showing {start}–{end} of {total.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+              Showing {start}–{end} of{" "}
+              {total.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             </div>
           </section>
           <ReportFilters
@@ -500,13 +459,28 @@ export default function Reports() {
             <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 { label: "Monthly Total Amount", value: reportTotals.Amount },
-                { label: "Monthly Total Discount", value: reportTotals.Discount },
-                { label: "Monthly Total Net Amount", value: reportTotals["Net Amount"] },
+                {
+                  label: "Monthly Total Discount",
+                  value: reportTotals.Discount,
+                },
+                {
+                  label: "Monthly Total Net Amount",
+                  value: reportTotals["Net Amount"],
+                },
               ].map((card) => (
-                <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{card.label}</p>
+                <div
+                  key={card.label}
+                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {card.label}
+                  </p>
                   <p className="mt-2 text-xl font-bold tabular-nums text-slate-800 dark:text-slate-100">
-                    ₹{Number(card.value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹
+                    {Number(card.value || 0).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
               ))}
@@ -528,6 +502,7 @@ export default function Reports() {
             </div>
           )}
           <ReportTable
+            reportType={activeReport}
             items={items}
             total={total}
             page={page}
@@ -535,7 +510,7 @@ export default function Reports() {
             onPageChange={setPage}
             loading={loading}
           />
-         
+
           <AppFooter />
         </main>
       </div>
