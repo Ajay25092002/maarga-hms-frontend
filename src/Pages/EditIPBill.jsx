@@ -281,11 +281,17 @@ function BillEditScreen({ expectedType }) {
           throw new Error(
             `This is not an ${expectedType} bill. Please open the ${expectedType} bill edit screen.`,
           );
-        } // Restore the standard rule: any discharged IP bill is read-only.
+        }
 
-        if (expectedType === "IP" && b.discharge_date) {
+        // Discharged IP bills are editable only when the backend confirms
+        // temporary allowlist access for this user and IP number.
+        if (
+          expectedType === "IP" &&
+          b.discharge_date &&
+          b.temporary_edit_access !== true
+        ) {
           throw new Error(
-            "This IP bill has a discharge date and can no longer be edited.",
+            "This IP bill has a discharge date and is not enabled for temporary editing.",
           );
         }
 

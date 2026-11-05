@@ -398,13 +398,7 @@ export default function Reports() {
                     : "Download full report"}
                 </button>
               )}
-              <button
-                onClick={() => window.print()}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              >
-                <Printer size={16} />
-                Print
-              </button>
+             
             </div>
           </section>
 

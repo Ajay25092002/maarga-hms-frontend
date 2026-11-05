@@ -892,10 +892,6 @@ export default function CreateOPBill() {
             )}
 
             <form onSubmit={handleGenerateBill} className="space-y-7">
-              <section className={`border-b pb-5 ${border}`}><div className="max-w-md"><SponsorSelect value={sponsorId} onChange={(id, name) => {
-      setSponsorId(id);
-      setSponsorName(name);
-    }} dark={dark} /></div></section>
               {/* Patient and provider details */}
 
               <section className={`border-b pb-6 ${border}`}>
@@ -1122,6 +1118,18 @@ export default function CreateOPBill() {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Sponsor */}
+                  <div>
+                    <SponsorSelect
+                      value={sponsorId}
+                      onChange={(id, name) => {
+                        setSponsorId(id);
+                        setSponsorName(name);
+                      }}
+                      dark={dark}
+                    />
                   </div>
 
                   {/* Rate Category */}

@@ -678,12 +678,13 @@ export default function IPBillDetails() {
 
                 )} */}
 
-                {bill && !bill.discharge_date && (
+                {bill && bill.can_edit === true && (
                   <button
                     type="button"
                     onClick={() => navigate(`/ip-billing/${billId}/edit`)}
                     disabled={loading || !bill || Boolean(error)}
                     className="inline-flex h-10 items-center gap-2 rounded-md border border-[#3E439C] px-4 text-sm font-semibold text-[#3E439C] disabled:opacity-60"
+                    title={bill.temporary_edit_access ? "Temporary edit access enabled for this IP bill" : undefined}
                   >
                     Edit Bill
                   </button>

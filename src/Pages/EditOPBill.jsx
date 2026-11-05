@@ -531,7 +531,6 @@ function BillEditScreen({ expectedType }) {
           ) : (
             bill && (
               <form onSubmit={save} className="space-y-5">
-                <section className={`border-b pb-5 ${border}`}><div className="max-w-md"><SponsorSelect value={bill.sponsor_id || ""} onChange={(value, name) => setBill(current => ({ ...current, sponsor_id: value, sponsor_name_snapshot: name }))} dark={dark} /></div></section>
                 {
                   /* Patient & Provider Details — editability controlled by DISABLED_OP_EDIT_FIELDS */
                 }
@@ -680,6 +679,20 @@ function BillEditScreen({ expectedType }) {
                           "psychologist_name",
                         )}
                         className={`${input} disabled:cursor-not-allowed disabled:opacity-75`}
+                      />
+                    </div>
+
+                    <div>
+                      <SponsorSelect
+                        value={bill.sponsor_id || ""}
+                        onChange={(value, name) =>
+                          setBill((current) => ({
+                            ...current,
+                            sponsor_id: value,
+                            sponsor_name_snapshot: name,
+                          }))
+                        }
+                        dark={dark}
                       />
                     </div>
 
