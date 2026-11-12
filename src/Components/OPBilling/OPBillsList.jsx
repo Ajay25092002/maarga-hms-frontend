@@ -12,12 +12,36 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Download,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
 import OPBillsTable from "./OPBillsTable";
 
 const PAGE_SIZE = 10;
+
+const MAX_EXPORT_RANGE_DAYS = 90;
+
+// Parse date-only values as UTC to avoid daylight-saving/time-zone drift.
+const dayNumber = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const shiftDate = (value, days) => {
+  const number = dayNumber(value);
+  if (number === null) return undefined;
+  return new Date((number + days) * 86400000).toISOString().slice(0, 10);
+};
+
+const getInclusiveRangeDays = (from, to) => {
+  const start = dayNumber(from);
+  const end = dayNumber(to);
+  if (start === null || end === null || end < start) return null;
+  return end - start + 1;
+};
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
@@ -81,6 +105,9 @@ export default function OPBillsList({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const [billedBy, setBilledBy] = useState("all");
   const [billCreators, setBillCreators] = useState([]);
   const [page, setPage] = useState(1);
@@ -148,6 +175,22 @@ export default function OPBillsList({
     // Debounce search input to avoid sending a request for
     // every keystroke.
     const timeoutId = setTimeout(async () => {
+      if (dateFilter === "custom") {
+        const rangeDays = getInclusiveRangeDays(dateFrom, dateTo);
+        if (rangeDays === null || rangeDays > MAX_EXPORT_RANGE_DAYS) {
+          setBills([]);
+          setPagination({
+            page: 1,
+            page_size: PAGE_SIZE,
+            total: 0,
+            total_pages: 0,
+          });
+          setSummary({ billed: 0, received: 0, outstanding: 0 });
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       setError("");
 
@@ -168,8 +211,12 @@ export default function OPBillsList({
           params.set("status", statusFilter);
         }
 
-        if (dateFilter !== "all") {
+        if (dateFilter !== "all" && dateFilter !== "custom") {
           params.set("date_filter", dateFilter);
+        }
+        if (dateFilter !== "custom" || (dateFrom && dateTo)) {
+          if (dateFrom) params.set("date_from", dateFrom);
+          if (dateTo) params.set("date_to", dateTo);
         }
         if (billedBy !== "all") {
           params.set("billed_by", billedBy);
@@ -269,7 +316,7 @@ export default function OPBillsList({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [page, search, statusFilter, dateFilter, billedBy, refreshKey]);
+  }, [page, search, statusFilter, dateFilter, dateFrom, dateTo, billedBy, refreshKey]);
 
   // ==========================================================
   // Filter handlers
@@ -287,6 +334,10 @@ export default function OPBillsList({
 
   const handleDate = useCallback((value) => {
     setDateFilter(value);
+    if (value !== "custom") {
+      setDateFrom("");
+      setDateTo("");
+    }
     setPage(1);
   }, []);
 
@@ -299,6 +350,8 @@ export default function OPBillsList({
     setSearch("");
     setStatusFilter("all");
     setDateFilter("all");
+    setDateFrom("");
+    setDateTo("");
     setBilledBy("all");
     setPage(1);
   };
@@ -311,6 +364,8 @@ export default function OPBillsList({
     search.trim() !== "" ||
     statusFilter !== "all" ||
     dateFilter !== "all" ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo) ||
     billedBy !== "all";
 
   // The API handles pagination. Do not slice bills again here.
@@ -327,6 +382,71 @@ export default function OPBillsList({
     currentPage * PAGE_SIZE,
     totalBills
   );
+
+  const handleExport = async () => {
+    const selectedRangeDays = getInclusiveRangeDays(dateFrom, dateTo);
+    const validCustomRange =
+      Boolean(dateFrom && dateTo) &&
+      selectedRangeDays !== null &&
+      selectedRangeDays <= MAX_EXPORT_RANGE_DAYS;
+
+    if (dateFilter === "all") {
+      setError("Select a date filter before downloading the CSV.");
+      return;
+    }
+    if (dateFilter === "custom" && !validCustomRange) {
+      setError("Select a valid date range of no more than 90 days.");
+      return;
+    }
+
+    setDownloading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ bill_type: "OP" });
+      if (search.trim()) params.set("search", search.trim());
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (dateFilter !== "all" && dateFilter !== "custom") {
+        params.set("date_filter", dateFilter);
+      }
+      if (dateFrom) params.set("date_from", dateFrom);
+      if (dateTo) params.set("date_to", dateTo);
+      if (billedBy !== "all") params.set("billed_by", billedBy);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/bills/export?${params.toString()}`,
+        { credentials: "include", headers: { Accept: "text/csv" } },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          typeof data?.detail === "string" ? data.detail : "Unable to download OP bills.",
+        );
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "op-bills.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      setError(downloadError.message || "Unable to download OP bills.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const customRangeDays = getInclusiveRangeDays(dateFrom, dateTo);
+  const customRangeComplete = Boolean(dateFrom && dateTo);
+  const customRangeValid =
+    customRangeComplete &&
+    customRangeDays !== null &&
+    customRangeDays <= MAX_EXPORT_RANGE_DAYS;
+  const canDownload =
+    dateFilter !== "all" &&
+    (dateFilter !== "custom" || customRangeValid);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -367,7 +487,7 @@ export default function OPBillsList({
 
       {/* Search and filters */}
       <section className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_200px_auto]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {/* Search */}
           <div className="relative min-w-0">
             <Search
@@ -424,12 +544,14 @@ export default function OPBillsList({
                 handleDate(event.target.value)
               }
               className={`${selectClass} w-full pl-9`}
-              aria-label="Filter by bill date"
+              aria-label="Filter by bill creation date"
             >
               <option value="all">All Dates</option>
               <option value="today">Today</option>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
+              <option value="this_month">This Month</option>
+              <option value="custom">Custom Range</option>
             </select>
           </div>
 
@@ -466,19 +588,75 @@ export default function OPBillsList({
             <RotateCcw size={14} />
             Reset
           </button>
+
+          {dateFilter === "custom" && (
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-[#E5E4F2] bg-[#FAFAFE] p-3 sm:col-span-2 sm:grid-cols-2 xl:col-span-5 xl:max-w-[560px] dark:border-slate-700 dark:bg-[#1B1C2D]">
+              <div className="min-w-0">
+                <label className={`mb-1 block text-xs font-medium ${muted}`}>From Date</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  min={dateTo ? shiftDate(dateTo, -(MAX_EXPORT_RANGE_DAYS - 1)) : undefined}
+                  onChange={(event) => { setDateFrom(event.target.value); setPage(1); }}
+                  className={inputClass}
+                  aria-label="From date"
+                />
+              </div>
+              <div className="min-w-0">
+                <label className={`mb-1 block text-xs font-medium ${muted}`}>To Date</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  max={dateFrom ? shiftDate(dateFrom, MAX_EXPORT_RANGE_DAYS - 1) : undefined}
+                  onChange={(event) => { setDateTo(event.target.value); setPage(1); }}
+                  className={inputClass}
+                  aria-label="To date"
+                />
+              </div>
+              <p className={`text-xs sm:col-span-2 ${muted}`}>
+                Choose a date range of up to 90 days. Both dates are required to filter and download.
+                {customRangeComplete && !customRangeValid && (
+                  <span className="mt-1 block font-medium text-red-600 dark:text-red-400">
+                    The selected range exceeds 90 days or the end date is before the start date.
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className={`text-xs ${muted}`}>
+            {dateFilter === "all"
+              ? "Select a date range to enable CSV download."
+              : `Showing ${firstRecord}–${lastRecord} of ${totalBills} bills`}
+          </p>
 
-
-          <button
-            type="button"
-            onClick={onCreateBill}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white transition hover:bg-[#323780]"
-          >
-            <Plus size={16} />
-            Create Bill
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canDownload && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={loading || downloading || !canDownload}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${border} ${text} ${
+                  dark ? "hover:bg-slate-800" : "hover:bg-[#F1F0FF]"
+                }`}
+              >
+                <Download size={15} />
+                {downloading ? "Preparing..." : "Download CSV"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onCreateBill}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white transition hover:bg-[#323780]"
+            >
+              <Plus size={16} />
+              Create Bill
+            </button>
+          </div>
         </div>
       </section>
 

@@ -10,12 +10,36 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  Download,
 } from "lucide-react";
 
 import { useTheme } from "../../Context/ThemeContext";
 import IPBillsTable from "./IPBillsTable";
 
 const PAGE_SIZE = 10;
+
+const MAX_EXPORT_RANGE_DAYS = 90;
+
+// Parse date-only values as UTC to avoid daylight-saving/time-zone drift.
+const dayNumber = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const shiftDate = (value, days) => {
+  const number = dayNumber(value);
+  if (number === null) return undefined;
+  return new Date((number + days) * 86400000).toISOString().slice(0, 10);
+};
+
+const getInclusiveRangeDays = (from, to) => {
+  const start = dayNumber(from);
+  const end = dayNumber(to);
+  if (start === null || end === null || end < start) return null;
+  return end - start + 1;
+};
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -66,6 +90,8 @@ export default function IPBillsList({
   onQueryChange,
   onPageChange,
   onResetFilters,
+  onExport,
+  downloading = false,
   onRetry,
   onCreateBill,
   onViewBill,
@@ -97,10 +123,23 @@ export default function IPBillsList({
       : "border-slate-200 bg-white text-slate-800"
   }`;
 
+  const dateFilter = query.date_filter ?? "all";
+  const customRangeDays = getInclusiveRangeDays(query.date_from, query.date_to);
+  const customRangeComplete = Boolean(query.date_from && query.date_to);
+  const customRangeValid =
+    customRangeComplete &&
+    customRangeDays !== null &&
+    customRangeDays <= MAX_EXPORT_RANGE_DAYS;
+  const canDownload =
+    dateFilter !== "all" &&
+    (dateFilter !== "custom" || customRangeValid);
+
   const hasFilters =
     Boolean(query.search?.trim()) ||
     (query.status ?? "all") !== "all" ||
     (query.date_filter ?? "all") !== "all" ||
+    Boolean(query.date_from) ||
+    Boolean(query.date_to) ||
     (query.billed_by ?? "all") !== "all";
 
   return (
@@ -137,7 +176,7 @@ export default function IPBillsList({
       </section>
 
       <section className="space-y-3">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_200px_auto]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <div className="relative min-w-0">
             <Search
               size={16}
@@ -187,12 +226,14 @@ export default function IPBillsList({
                 onQueryChange?.({ date_filter: event.target.value })
               }
               className={`${selectClass} w-full pl-9`}
-              aria-label="Filter by bill date"
+              aria-label="Filter by bill creation date"
             >
               <option value="all">All Dates</option>
               <option value="today">Today</option>
               <option value="7days">Last 7 Days</option>
               <option value="30days">Last 30 Days</option>
+              <option value="this_month">This Month</option>
+              <option value="custom">Custom Range</option>
             </select>
           </div>
 
@@ -229,22 +270,81 @@ export default function IPBillsList({
             <RotateCcw size={14} />
             Reset
           </button>
+
+          {query.date_filter === "custom" && (
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-[#E5E4F2] bg-[#FAFAFE] p-3 sm:col-span-2 sm:grid-cols-2 xl:col-span-5 xl:max-w-[560px] dark:border-slate-700 dark:bg-[#1B1C2D]">
+              <div className="min-w-0">
+                <label className={`mb-1 block text-xs font-medium ${muted}`}>From Date</label>
+                <input
+                  type="date"
+                  value={query.date_from ?? ""}
+                  max={query.date_to || undefined}
+                  min={query.date_to ? shiftDate(query.date_to, -(MAX_EXPORT_RANGE_DAYS - 1)) : undefined}
+                  onChange={(event) => onQueryChange?.({ date_from: event.target.value })}
+                  className={inputClass}
+                  aria-label="From date"
+                />
+              </div>
+              <div className="min-w-0">
+                <label className={`mb-1 block text-xs font-medium ${muted}`}>To Date</label>
+                <input
+                  type="date"
+                  value={query.date_to ?? ""}
+                  min={query.date_from || undefined}
+                  max={query.date_from ? shiftDate(query.date_from, MAX_EXPORT_RANGE_DAYS - 1) : undefined}
+                  onChange={(event) => onQueryChange?.({ date_to: event.target.value })}
+                  className={inputClass}
+                  aria-label="To date"
+                />
+              </div>
+              <p className={`text-xs sm:col-span-2 ${muted}`}>
+                Choose a date range of up to 90 days. Both dates are required to filter and download.
+                {customRangeComplete && !customRangeValid && (
+                  <span className="mt-1 block font-medium text-red-600 dark:text-red-400">
+                    The selected range exceeds 90 days or the end date is before the start date.
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className={`text-xs ${muted}`}>
-            {loading
-              ? "Loading inpatient bills..."
-              : `Showing ${firstRecord}–${lastRecord} of ${totalBills} bills`}
-          </p>
-          <button
-            type="button"
-            onClick={onCreateBill}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white transition hover:bg-[#323780]"
-          >
-            <Plus size={16} />
-            Create IP Bill
-          </button>
+          <div className="min-w-0">
+            <p className={`text-xs ${muted}`}>
+              {loading
+                ? "Loading inpatient bills..."
+                : `Showing ${firstRecord}–${lastRecord} of ${totalBills} bills`}
+            </p>
+            {dateFilter === "all" && (
+              <p className={`mt-1 text-xs ${muted}`}>
+                Select a date range to enable CSV download.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canDownload && (
+              <button
+                type="button"
+                onClick={onExport}
+                disabled={loading || downloading || !canDownload}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${border} ${text} ${
+                  dark ? "hover:bg-slate-800" : "hover:bg-[#F1F0FF]"
+                }`}
+              >
+                <Download size={15} />
+                {downloading ? "Preparing..." : "Download CSV"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onCreateBill}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#3E439C] px-4 text-sm font-semibold text-white transition hover:bg-[#323780]"
+            >
+              <Plus size={16} />
+              Create IP Bill
+            </button>
+          </div>
         </div>
       </section>
 

@@ -495,7 +495,7 @@ export default function OPBillDetails() {
 
   const dateOfBirth = bill?.date_of_birth ?? bill?.patient?.date_of_birth;
 
-  const billDate = bill?.bill_date ?? bill?.created_at;
+  const billDate = bill?.bill_date ?? null;
 
   const buttonClass = `inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition ${border} ${text} ${
     dark ? "hover:bg-slate-800" : "hover:bg-white"

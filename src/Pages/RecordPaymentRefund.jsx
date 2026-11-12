@@ -128,7 +128,7 @@ function normalizeBill(bill) {
     total_paid: Number(bill.total_payments ?? bill.total_paid ?? bill.amount_paid ?? 0),
     total_refunded: Number(bill.total_refunds ?? bill.total_refunded ?? 0),
     outstanding_amount: Number(bill.outstanding_amount ?? 0),
-    bill_date: bill.bill_date ?? bill.created_at ?? null,
+    bill_date: bill.bill_date ?? null,
     discharge_date: bill.discharge_date ?? null,
   };
 }

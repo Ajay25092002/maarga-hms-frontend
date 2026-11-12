@@ -294,7 +294,7 @@ export default function IPBillsTable({
                     <TableCell
                       className={`whitespace-nowrap px-4 py-3 text-xs ${theme.secondaryText}`}
                     >
-                      {formatDate(bill?.bill_date ?? bill?.created_at)}
+                      {formatDate(bill?.bill_date)}
                     </TableCell>
 
                     <TableCell className={`max-w-[180px] px-4 py-3 text-xs ${theme.secondaryText}`}>

@@ -594,7 +594,7 @@ export default function NurseBillDetails() {
                       <p className={`text-xs ${muted}`}>Bill Date</p>
 
                       <p className={`mt-1 text-sm font-medium ${text}`}>
-                        {formatDate(bill.bill_date ?? bill.created_at, true)}
+                        {formatDate(bill.bill_date, true)}
                       </p>
                     </div>
 

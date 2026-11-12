@@ -14,6 +14,29 @@ const API_BASE_URL = (
 
 const PAGE_SIZE = 10;
 
+const MAX_EXPORT_RANGE_DAYS = 90;
+
+// Parse date-only values as UTC to avoid daylight-saving/time-zone drift.
+const dayNumber = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const shiftDate = (value, days) => {
+  const number = dayNumber(value);
+  if (number === null) return undefined;
+  return new Date((number + days) * 86400000).toISOString().slice(0, 10);
+};
+
+const getInclusiveRangeDays = (from, to) => {
+  const start = dayNumber(from);
+  const end = dayNumber(to);
+  if (start === null || end === null || end < start) return null;
+  return end - start + 1;
+};
+
 const EMPTY_PAGINATION = {
   page: 1,
   page_size: PAGE_SIZE,
@@ -51,6 +74,7 @@ export default function IPBills() {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [billCreators, setBillCreators] = useState([]);
+  const [downloading, setDownloading] = useState(false);
 
   // Query state is owned by the page so the API, not the browser,
   // performs searching, filtering, and pagination.
@@ -60,6 +84,8 @@ export default function IPBills() {
     search: "",
     status: "all",
     date_filter: "all",
+    date_from: "",
+    date_to: "",
     billed_by: "all",
   });
 
@@ -86,6 +112,22 @@ export default function IPBills() {
 
   const loadBills = useCallback(
     async (signal) => {
+      if (query.date_filter === "custom") {
+        const rangeDays = getInclusiveRangeDays(query.date_from, query.date_to);
+        if (rangeDays === null || rangeDays > MAX_EXPORT_RANGE_DAYS) {
+          setBills([]);
+          setPagination({
+            page: 1,
+            page_size: query.page_size,
+            total: 0,
+            total_pages: 0,
+          });
+          setSummary(EMPTY_SUMMARY);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       setError("");
 
@@ -99,8 +141,12 @@ export default function IPBills() {
         const search = query.search.trim();
         if (search) params.set("search", search);
         if (query.status !== "all") params.set("status", query.status);
-        if (query.date_filter !== "all") {
+        if (query.date_filter !== "all" && query.date_filter !== "custom") {
           params.set("date_filter", query.date_filter);
+        }
+        if (query.date_filter !== "custom" || (query.date_from && query.date_to)) {
+          if (query.date_from) params.set("date_from", query.date_from);
+          if (query.date_to) params.set("date_to", query.date_to);
         }
         if (query.billed_by !== "all") {
           params.set("billed_by", query.billed_by);
@@ -174,11 +220,18 @@ export default function IPBills() {
   const handleQueryChange = (changes) => {
     setQuery((current) => {
       const next = { ...current, ...changes };
+      if (
+        Object.prototype.hasOwnProperty.call(changes, "date_filter") &&
+        changes.date_filter !== "custom"
+      ) {
+        next.date_from = "";
+        next.date_to = "";
+      }
 
       // Any search/filter change should start from the first page.
       if (
         Object.keys(changes).some((key) =>
-          ["search", "status", "date_filter", "billed_by", "page_size"].includes(key)
+          ["search", "status", "date_filter", "date_from", "date_to", "billed_by", "page_size"].includes(key)
         )
       ) {
         next.page = 1;
@@ -199,11 +252,64 @@ export default function IPBills() {
       search: "",
       status: "all",
       date_filter: "all",
+      date_from: "",
+      date_to: "",
       billed_by: "all",
     });
   };
 
   const handleRetry = () => setReloadKey((current) => current + 1);
+
+  const handleExport = async () => {
+    if (query.date_filter === "all") {
+      setError("Select a date filter before downloading the CSV.");
+      return;
+    }
+    if (query.date_filter === "custom") {
+      const rangeDays = getInclusiveRangeDays(query.date_from, query.date_to);
+      if (rangeDays === null || rangeDays > MAX_EXPORT_RANGE_DAYS) {
+        setError("Select a valid date range of no more than 90 days.");
+        return;
+      }
+    }
+
+    setDownloading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ bill_type: "IP" });
+      const search = query.search.trim();
+      if (search) params.set("search", search);
+      if (query.status !== "all") params.set("status", query.status);
+      if (query.date_filter !== "all" && query.date_filter !== "custom") {
+        params.set("date_filter", query.date_filter);
+      }
+      if (query.date_from) params.set("date_from", query.date_from);
+      if (query.date_to) params.set("date_to", query.date_to);
+      if (query.billed_by !== "all") params.set("billed_by", query.billed_by);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/bills/export?${params.toString()}`,
+        { credentials: "include", headers: { Accept: "text/csv" } },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(getErrorMessage(data, "Unable to download IP bills."));
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ip-bills.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      setError(downloadError.message || "Unable to download IP bills.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleCreateBill = () => navigate("/ip-billing/new");
 
@@ -257,6 +363,8 @@ export default function IPBills() {
               onQueryChange={handleQueryChange}
               onPageChange={handlePageChange}
               onResetFilters={handleResetFilters}
+              onExport={handleExport}
+              downloading={downloading}
               onRetry={handleRetry}
               onCreateBill={handleCreateBill}
               onViewBill={handleViewBill}

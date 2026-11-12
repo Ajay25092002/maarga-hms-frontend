@@ -362,7 +362,7 @@ export default function OPBillsTable({
                     <TableCell
                       className={`whitespace-nowrap px-4 py-3 text-xs ${theme.secondaryText}`}
                     >
-                      {formatDate(bill?.bill_date ?? bill?.created_at)}
+                      {formatDate(bill?.bill_date)}
                     </TableCell>
 
                     <TableCell

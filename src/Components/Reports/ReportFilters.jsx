@@ -259,15 +259,15 @@ export default function ReportFilters({
 
         {reportType === "admission-discharge" && (
           <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-            Admission status
+            Event type
             <select
               value={filters.status}
               onChange={(e) => set("status", e.target.value)}
               className="mt-1.5 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal dark:border-slate-700 dark:bg-slate-800"
             >
-              <option value="">All statuses</option>
-              <option value="admitted">Currently admitted</option>
-              <option value="discharged">Discharged</option>
+              <option value="">All events</option>
+              <option value="admission">Admissions</option>
+              <option value="discharge">Discharges</option>
             </select>
           </label>
         )}
