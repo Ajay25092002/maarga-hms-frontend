@@ -71,6 +71,16 @@ const isFrontendRateService = (serviceName) =>
       .toUpperCase(),
   );
 
+// GST is calculated per billed day. The room-rent rate represents one day's rent.
+const calculateRoomRentGST = (dailyRate, quantity) => {
+  const rate = Math.max(0, Number(dailyRate) || 0);
+  const days = Math.max(0, Number(quantity) || 0);
+
+  if (rate <= 5000 || days <= 0) return 0;
+
+  return Math.round((rate * days * 0.05 + Number.EPSILON) * 100) / 100;
+};
+
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -1057,7 +1067,7 @@ export default function CreateIPBill() {
           const discount = Math.min(gross, requestedDiscount);
 
           const gst = isGstEligible(category, item)
-            ? Math.max(0, Number(item.gst_amount) || 0)
+            ? calculateRoomRentGST(rate, quantity)
             : 0;
 
           return {
@@ -1225,12 +1235,6 @@ export default function CreateIPBill() {
           "Each discount must be non-negative and cannot exceed the charge amount.",
         );
       }
-
-      const gst = Number(item.gst_amount || 0);
-
-      if (!Number.isFinite(gst) || gst < 0) {
-        return fail("GST must be a valid non-negative amount.");
-      }
     }
 
     if (billSummary.total <= 0) {
@@ -1277,7 +1281,9 @@ export default function CreateIPBill() {
 
             discount_amount: Number(item.discount_amount || 0),
 
-            gst_amount: gstEligible ? Number(item.gst_amount || 0) : 0,
+            gst_amount: gstEligible
+              ? calculateRoomRentGST(item.rate, item.quantity)
+              : 0,
           };
         }),
     );
@@ -1822,7 +1828,7 @@ export default function CreateIPBill() {
                           const gstEligible = isGstEligible(category, item);
 
                           const gstAmount = gstEligible
-                            ? Math.max(0, Number(item.gst_amount) || 0)
+                            ? calculateRoomRentGST(rate, quantity)
                             : 0;
 
                           const netWithGst =
@@ -2030,20 +2036,12 @@ export default function CreateIPBill() {
                               </td>
 
                               <td className="px-3 py-2.5 align-middle">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.gst_amount}
-                                  disabled={!gstEligible}
-                                  onChange={(event) =>
-                                    updateCharge(category.id, item.id, {
-                                      gst_amount: event.target.value,
-                                    })
-                                  }
-                                  className={`${inputClass} text-right disabled:cursor-not-allowed disabled:opacity-50`}
-                                  aria-label="GST amount"
-                                />
+                                <div
+                                  className={`${readOnlyClass} justify-end text-right`}
+                                  aria-label="Automatically calculated GST amount"
+                                >
+                                  {currency(gstAmount)}
+                                </div>
                               </td>
 
                               <td

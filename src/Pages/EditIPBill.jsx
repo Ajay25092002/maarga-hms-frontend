@@ -128,6 +128,28 @@ const money = (v) =>
     Number(v) || 0,
   );
 
+// GST is calculated per billed day. The room-rent rate represents one day's rent.
+const calculateRoomRentGST = (item) => {
+  // Existing database rows keep their saved GST exactly as stored.
+  // Only newly added rows (without item_id) use the automatic GST rule.
+  if (item?.item_id != null) {
+    return Math.max(0, Number(item.gst_amount) || 0);
+  }
+
+  const serviceName = String(item?.service_name || "").trim().toUpperCase();
+  const groupName = String(item?.group_name || "").trim().toUpperCase();
+  const rate = Math.max(0, Number(item?.rate) || 0);
+  const quantity = Math.max(0, Number(item?.quantity) || 0);
+
+  if (serviceName !== "ROOM RENT" || groupName !== "ACCOMMODATION CHARGES") {
+    return 0;
+  }
+
+  if (rate <= 5000 || quantity <= 0) return 0;
+
+  return Math.round((rate * quantity * 0.05 + Number.EPSILON) * 100) / 100;
+};
+
 const makeKey = () => `${Date.now()}-${Math.random()}`;
 
 const api = async (url, options = {}) => {
@@ -305,6 +327,10 @@ function BillEditScreen({ expectedType }) {
           (b.items || []).map((x) => ({
             key: makeKey(),
 
+            // Keep the persisted row ID so the backend can distinguish an
+            // existing historical item from a newly added item.
+            item_id: x.id ?? null,
+
             service_id: String(x.service_id),
 
             service_name: x.service_name || x.name || "",
@@ -375,7 +401,7 @@ function BillEditScreen({ expectedType }) {
   );
 
   const gst = useMemo(
-    () => items.reduce((s, i) => s + (Number(i.gst_amount) || 0), 0),
+    () => items.reduce((sum, item) => sum + calculateRoomRentGST(item), 0),
 
     [items],
   );
@@ -609,6 +635,8 @@ function BillEditScreen({ expectedType }) {
         rate_category: bill.rate_category || null,
 
         items: items.map((i) => ({
+          item_id: i.item_id ?? null,
+
           service_id: Number(i.service_id),
 
           service_date: i.service_date,
@@ -634,7 +662,7 @@ function BillEditScreen({ expectedType }) {
 
           discount_amount: Number(i.discount_amount || 0),
 
-          gst_amount: Number(i.gst_amount || 0), // Preserve the note entered for this service.
+          gst_amount: calculateRoomRentGST(i),
 
           special_note: i.special_note?.trim() || null,
         })),
@@ -1196,10 +1224,12 @@ function BillEditScreen({ expectedType }) {
                             Number(item.discount_amount) || 0,
                           );
 
+                          const calculatedGST = calculateRoomRentGST(item);
+
                           const net = Math.max(
                             0,
 
-                            gross - discount + (Number(item.gst_amount) || 0),
+                            gross - discount + calculatedGST,
                           );
 
                           return (
@@ -1430,32 +1460,12 @@ function BillEditScreen({ expectedType }) {
                                                            {" "}
                               <td className="px-3 py-2.5 align-middle">
                                                                {" "}
-                                {String(item.service_name || "")
-                                  .trim()
-
-                                  .toLowerCase() === "room rent" ? (
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    className={`${input} text-right`}
-                                    value={item.gst_amount}
-                                    onChange={(e) =>
-                                      updateItem(item.key, {
-                                        gst_amount: e.target.value,
-                                      })
-                                    }
-                                    aria-label={`GST for item ${index + 1}`}
-                                  />
-                                ) : (
-                                  <span
-                                    className={`block text-right whitespace-nowrap ${muted}`}
-                                  >
-                                                                       {" "}
-                                    {money(item.gst_amount)}                   
-                                                 {" "}
-                                  </span>
-                                )}
+                                <span
+                                  className={`block text-right whitespace-nowrap ${muted}`}
+                                  aria-label={`Automatically calculated GST for item ${index + 1}`}
+                                >
+                                  {money(calculatedGST)}
+                                </span>
                                                              {" "}
                               </td>
                                                            {" "}
